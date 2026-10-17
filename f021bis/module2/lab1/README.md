@@ -41,7 +41,7 @@ the solution's vault to your `~/.vault_pass`, runs `site.yml`).
 
 The solution was run against three `ubuntu:24.04` systemd + sshd containers
 (privileged, `/lib/modules` mounted, as the spec describes the lab 0 nodes)
-with ansible-core 2.17. Not yet on the f021bis consoles: `lab0/` does not
+with ansible-core 2.17, then 2.19. Not yet on the f021bis consoles: `lab0/` does not
 exist yet.
 
 - **A missing `~/.vault_pass` breaks every command** once `ansible.cfg`
@@ -49,9 +49,11 @@ exist yet.
 - **`/etc/hosts` cannot be replaced** in a container (Docker bind-mounts it):
   `blockinfile` fails with `[Errno 16] Device or resource busy` unless
   `unsafe_writes: true`. Step 3 lets them hit it.
-- **`password_hash` needs `passlib`** in the venv: ansible-core 2.17 no
-  longer falls back to Python's `crypt`. Kubespray's `requirements.txt` does
-  not bring it; `lab0 venv` must.
+- **`password_hash` needs `passlib`** in the venv: ansible-core ≥ 2.17 no
+  longer falls back to Python's `crypt`. Kubespray v2.32.0's
+  `requirements.txt` pins `passlib==1.7.4`, so the venv has it.
+- Re-run with ansible-core 2.19 (Kubespray v2.32.0's pin) during lab 2:
+  same results.
 - **Handlers run in check mode**: the handler is reported `changed` and
   restarts nothing. `ansible.posix.sysctl` has no `--diff` output.
 - **`net.bridge.*` sysctls exist only once `br_netfilter` is loaded**, so

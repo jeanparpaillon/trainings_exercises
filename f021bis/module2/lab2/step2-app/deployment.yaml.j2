@@ -1,0 +1,42 @@
+# k8s/templates/deployment.yaml.j2 — given, to complete (the TODOs).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: web
+  labels:
+    app: web
+spec:
+  replicas: TODO   # from the environment's vars
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+      annotations:
+        # A new page changes the pod template, hence a rollout: a mounted
+        # ConfigMap alone is only picked up by the kubelet a minute later.
+        checksum/page: TODO   # the sha256 of the rendered page: lookup the template, hash it
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.30.6-alpine
+          ports:
+            - name: http
+              containerPort: 80
+          env:
+            # TODO: WEB_PASSWORD, from key `password` of Secret web-credentials
+          readinessProbe:
+            httpGet: { path: /, port: http }
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { memory: 64Mi }
+          volumeMounts:
+            - name: content
+              mountPath: /usr/share/nginx/html
+      volumes:
+        - name: content
+          configMap:
+            name: web-page

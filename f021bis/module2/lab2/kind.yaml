@@ -1,0 +1,23 @@
+# Lab 2 — `iac`: one control plane, one worker.
+#
+#   kind create cluster --name iac --config lab2/kind.yaml --image "$KIND_NODE"
+#
+# The web application of step 2 is a NodePort (30081). The mapping publishes
+# it on 127.0.0.1:30081 of the console pod, which shares the network of the
+# Docker daemon running the nodes: `curl http://127.0.0.1:30081/`.
+#
+# No control-plane taint: with two nodes, the drain of step 5 needs the other
+# node to take the pods. A lab compromise — in production, keep workloads off
+# the control plane.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      - { containerPort: 30081, hostPort: 30081, listenAddress: "127.0.0.1", protocol: TCP }
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          taints: []
+  - role: worker

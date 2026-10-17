@@ -1,0 +1,13 @@
+# Step 4: the chart and its values, as a dict — what `helm -f values.yaml`
+# would read.
+podinfo_chart_version: 6.15.0
+podinfo_values:
+  replicaCount: 2
+  ui:
+    message: deployed by Ansible, with Helm
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 64Mi

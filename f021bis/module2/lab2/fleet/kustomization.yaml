@@ -1,0 +1,8 @@
+# What Flux deploys in step 6, from this directory of this repo (branch
+# master). The trainer changes it during the step: every pair's `iac` follows.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: gitops
+resources:
+  - namespace.yaml
+  - podinfo.yaml

@@ -1,0 +1,4 @@
+- name: Prepare the Kubernetes nodes
+  hosts: k8s_cluster
+  roles:
+    - k8s_node_prereqs

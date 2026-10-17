@@ -1,0 +1,12 @@
+# The controller itself: no SSH, and the venv's Python, the one that has the
+# `kubernetes` client (not /usr/bin/python3).
+ansible_connection: local
+ansible_python_interpreter: "{{ ansible_playbook_python }}"
+# ansible.cfg says become = true, for the nodes. Here it would mean sudo in
+# the console, for nothing: the API does not care who we are locally.
+ansible_become: false
+
+# Which cluster, passed to every kubernetes.core module by module_defaults.
+# Lab 3 overrides both with -e, to run flux.yml against `spray`.
+k8s_kubeconfig: ~/.kube/config
+k8s_context: kind-iac

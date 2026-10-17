@@ -8,9 +8,10 @@ slides it belongs to, and the slides point back with
 `📖 module2/README.md — Lab N`.
 
 > **Status: specification.** This README describes what each lab must
-> contain and check. **Lab 1 is written** (`lab1/`, `make catch-up-lab1`) and
-> its solution was run on local container nodes, not yet on the consoles;
-> `lab0/`, labs 2 and 3 are not written and nothing else has been run. Items marked **(to validate)**
+> contain and check. **Labs 1 and 2 are written** (`lab1/`, `lab2/`,
+> `make catch-up-lab1`) and their solutions were run locally (container
+> nodes, kind), not yet on the consoles; `lab0/` and lab 3 are not written.
+> Each lab's README ends with what that run found. Items marked **(to validate)**
 > are assumptions to confirm on the first dry run. The biggest one is
 > Kubespray on container nodes (see [Nodes](#nodes--requirements-for-lab0)):
 > settle it first, before any step file is written.
@@ -69,7 +70,7 @@ console.
 
 | Target | Does |
 | --- | --- |
-| `make -C lab0 venv` | `~/.venvs/m2`: Kubespray's `requirements.txt` at `KUBESPRAY_VERSION` (it pins `ansible-core`), `kubernetes==PYTHON_KUBERNETES_VERSION`, `passlib` (lab 1's `password_hash`: ansible-core ≥ 2.17 no longer falls back to `crypt`); then `kubernetes.core` and `ansible.posix` at their pinned versions into `~/.ansible/collections` |
+| `make -C lab0 venv` | `~/.venvs/m2`: Kubespray's `requirements.txt` at `KUBESPRAY_VERSION` (it pins `ansible-core`), `kubernetes==PYTHON_KUBERNETES_VERSION` (`passlib`, which lab 1's `password_hash` needs, is in Kubespray v2.32.0's requirements; add it if a release drops it); then `kubernetes.core` and `ansible.posix` at their pinned versions into `~/.ansible/collections` |
 | `make -C lab0 kubespray` | `~/kubespray`, a clone of `kubernetes-sigs/kubespray` at `KUBESPRAY_VERSION` (detached tag, read-only reference: never edited) |
 | `make -C lab0 image` | builds `m2-node:latest` (Dockerfile in `lab0/node/`) |
 | `make -C lab0 up` | network `m2` (`NODE_SUBNET`), `node1`…`node3` at **fixed IPs** `.11`–`.13`, their names in the console's `/etc/hosts`, `~/.ssh/id_ed25519` created if missing and authorized for user `ansible` |
@@ -175,9 +176,12 @@ an end state changes.
 | `kubectl`, `helm` (v4), `kind`, `docker`, `git`, `ssh` | console image |
 | `python3-venv` | console image (already there) |
 
-`kubernetes.core.helm` drives the `helm` binary of the console: check that
-the pinned collection supports Helm v4 **(to validate)**; if not, lab 0
-installs a Helm v3 into `~/bin/helm3` and lab 2 step 4 sets `binary_path`.
+`kubernetes.core.helm` drives the `helm` binary of the console: the pinned
+collection (6.6.0) works with Helm v4.3.0 (validated locally in lab 2).
+
+Flux's `install.yaml` pulls 7 images (~330 MB) from ghcr.io in lab 2 step 6
+(5 min 44 s on one local run): **(to decide)** whether `lab0` pre-pulls
+them into the console's Docker for `kind load`.
 
 ## Lab 1 — Ansible refresher (session 1)
 
@@ -274,7 +278,8 @@ Slides: *Session 2* (`ansible_k8s.md`), *Session 3* (`iac_workflows.md`),
 Everything goes in `~/m2/k8s/` (its own `ansible.cfg`-less subdirectory,
 playbooks run from `~/m2`), so lab 3 can reuse it against `spray`.
 
-1. **step1-cluster** — given `lab2/kind.yaml` (1 control plane + 1 worker,
+1. **step1-cluster** — given `lab2/kind.yaml` (1 control plane, untainted by a
+   kubeadm patch so that step 5 can drain + 1 worker,
    `KIND_NODE`, NodePort 30081 on 127.0.0.1); `kind create cluster --name
    iac --config …`. Inventory addition: host `localhost` with
    `ansible_connection: local`,
@@ -282,8 +287,9 @@ playbooks run from `~/m2`), so lab 3 can reuse it against `spray`.
    Python, which has the `kubernetes` client) in a group `k8s_api`.
    Group var `k8s_kubeconfig` (default `~/.kube/config`) and `k8s_context`
    (`kind-iac`), passed to every module through `module_defaults` for the
-   group `group/kubernetes.core.k8s` **(to validate: the action group name in
-   the pinned collection)**. Check: a playbook with `kubernetes.core.k8s_info`
+   group `group/kubernetes.core.k8s` (validated; `group/kubernetes.core.helm`
+   for step 4; lookups take no `module_defaults`). `localhost` also gets
+   `ansible_become: false`. Check: a playbook with `kubernetes.core.k8s_info`
    on `kind: Node`, `debug` of the names. Question: where does this task
    run, and what does it need on `node1`? (nothing — the API).
 2. **step2-app** — playbook `k8s/app.yml`, vars per environment in
@@ -309,7 +315,7 @@ playbooks run from `~/m2`), so lab 3 can reuse it against `spray`.
    Questions: who deletes it? what would `state: absent` for it look like,
    and when can you remove that task again? (this is the *prune* row of the
    comparison table, session 3).
-4. **step4-helm** — `kubernetes.core.helm_repository` (podinfo's
+4. **step4-helm** — `k8s/podinfo.yml`: `kubernetes.core.helm_repository` (podinfo's
    repo), `kubernetes.core.helm` release `podinfo` in namespace `podinfo`,
    `chart_version: PODINFO_CHART_VERSION`, `values` from a YAML dict in
    `k8s/vars/`, `wait: true`, `create_namespace: true`. Change
@@ -328,7 +334,7 @@ playbooks run from `~/m2`), so lab 3 can reuse it against `spray`.
    Flux's `install.yaml` at `FLUX_VERSION` (pinned URL, checksum), applied
    with `kubernetes.core.k8s src:`, wait for the controllers' Deployments
    in `flux-system`; then a `GitRepository` on
-   `https://github.com/jeanparpaillon/trainings_exercises`, branch `main`,
+   `https://github.com/jeanparpaillon/trainings_exercises`, branch `master`,
    and a `Kustomization` on `./f021bis/module2/lab2/fleet` with
    `prune: true`, `interval: 1m`, both from templates. Given:
    `lab2/fleet/` — namespace `gitops`, podinfo Deployment + Service
@@ -342,8 +348,8 @@ playbooks run from `~/m2`), so lab 3 can reuse it against `spray`.
    Commit, tag `lab2`, then `kind delete cluster --name iac` (the room's
    memory goes to lab 3).
 
-**End state**: `~/m2/k8s/` with `app.yml`, `maintenance.yml`, `flux.yml`,
-`vars/`, `templates/`; no cluster.
+**End state**: `~/m2/k8s/` with `nodes.yml`, `app.yml`, `podinfo.yml`,
+`maintenance.yml`, `flux.yml`, `vars/`, `templates/`; no cluster.
 
 ## Lab 3 — Kubespray (sessions 4 and 5)
 
@@ -480,7 +486,7 @@ module2/
   Makefile             catch-up-lab1 (written), catch-up-lab3a
   lab0/                Makefile, node/{Dockerfile,entrypoint}
   lab1/                README.md, step1…5/, solution/ (written)
-  lab2/                README.md, kind.yaml, fleet/, step1…6/, solution/
+  lab2/                README.md, kind.yaml, fleet/, step1…6/, solution/ (written)
   lab3/                README.md, group_vars/k8s_cluster/zz-containers.yml,
                        load, step1…9/, solution-3a/, solution/
 ```
