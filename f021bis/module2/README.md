@@ -8,8 +8,9 @@ slides it belongs to, and the slides point back with
 `📖 module2/README.md — Lab N`.
 
 > **Status: specification.** This README describes what each lab must
-> contain and check; the step files, `lab0/` and the solutions are not
-> written yet and nothing here has been run. Items marked **(to validate)**
+> contain and check. **Lab 1 is written** (`lab1/`, `make catch-up-lab1`) and
+> its solution was run on local container nodes, not yet on the consoles;
+> `lab0/`, labs 2 and 3 are not written and nothing else has been run. Items marked **(to validate)**
 > are assumptions to confirm on the first dry run. The biggest one is
 > Kubespray on container nodes (see [Nodes](#nodes--requirements-for-lab0)):
 > settle it first, before any step file is written.
@@ -68,7 +69,7 @@ console.
 
 | Target | Does |
 | --- | --- |
-| `make -C lab0 venv` | `~/.venvs/m2`: Kubespray's `requirements.txt` at `KUBESPRAY_VERSION` (it pins `ansible-core`), `kubernetes==PYTHON_KUBERNETES_VERSION`; then `kubernetes.core` and `ansible.posix` at their pinned versions into `~/.ansible/collections` |
+| `make -C lab0 venv` | `~/.venvs/m2`: Kubespray's `requirements.txt` at `KUBESPRAY_VERSION` (it pins `ansible-core`), `kubernetes==PYTHON_KUBERNETES_VERSION`, `passlib` (lab 1's `password_hash`: ansible-core ≥ 2.17 no longer falls back to `crypt`); then `kubernetes.core` and `ansible.posix` at their pinned versions into `~/.ansible/collections` |
 | `make -C lab0 kubespray` | `~/kubespray`, a clone of `kubernetes-sigs/kubespray` at `KUBESPRAY_VERSION` (detached tag, read-only reference: never edited) |
 | `make -C lab0 image` | builds `m2-node:latest` (Dockerfile in `lab0/node/`) |
 | `make -C lab0 up` | network `m2` (`NODE_SUBNET`), `node1`…`node3` at **fixed IPs** `.11`–`.13`, their names in the console's `/etc/hosts`, `~/.ssh/id_ed25519` created if missing and authorized for user `ansible` |
@@ -194,10 +195,12 @@ Slides: *Session 1* (`ansible_basics.md`), *Lab 1* (`lab_ansible_basics.md`).
 Start: `make -C lab0 check` green (the trainer ran `pull-consoles`).
 
 1. **step1-project** — `~/m2`, `git init`, `.gitignore` (`.vault_pass`,
-   `inventory/artifacts/`); `ansible.cfg`: `inventory = ./inventory`,
+   `inventory/artifacts/`); `~/.vault_pass` created **here** (once
+   `ansible.cfg` names it, every command fails without it, `ansible-inventory`
+   included); `ansible.cfg`: `inventory = ./inventory`,
    `remote_user = ansible`, `become = true`, `roles_path = ./roles`,
    `vault_password_file = ~/.vault_pass`, `host_key_checking = False` (lab
-   nodes are recreated). `inventory/hosts.yml` in YAML, the groups of
+   nodes are recreated), `interpreter_python = auto_silent`. `inventory/hosts.yml` in YAML, the groups of
    Kubespray's sample inventory at `KUBESPRAY_VERSION` **(to validate the
    exact names in that release)**: `kube_control_plane: node1`, `etcd:
    node1`, `kube_node: node2`, `k8s_cluster` = children of the first ones;
@@ -218,33 +221,40 @@ Start: `make -C lab0 check` green (the trainer ran `pull-consoles`).
    - packages (`conntrack`, `socat`, `ipset`, `ebtables`) with
      `ansible.builtin.apt`, `cache_valid_time`;
    - `/etc/modules-load.d/k8s.conf` from a template looping over
-     `k8s_modules`; handler: restart `systemd-modules-load`;
+     `k8s_modules`; handler: restart `systemd-modules-load`, flushed
+     (`meta: flush_handlers`) before the sysctls: `net.bridge.*` only exist
+     once `br_netfilter` is loaded;
    - `ansible.posix.sysctl` for the **`net.*` keys only**, into
      `/etc/sysctl.d/99-k8s.conf` (a comment in the defaults says why: the
      others are global, step 2);
    - an `/etc/hosts` block (`ansible.builtin.blockinfile`) listing every host
-     of the inventory from `hostvars` — Jinja over `groups['all']`;
+     of the inventory from `hostvars` — Jinja over `groups['all']`, skipping
+     hosts without `ansible_host` (lab 2's `localhost`); needs
+     `unsafe_writes: true`, Docker bind-mounts `/etc/hosts` (`Errno 16`
+     otherwise) — the trainees hit the error first;
    - `ansible.builtin.assert` that `ansible_swaptotal_mb == 0`, with a
      `fail_msg` that says why the role checks rather than fixes.
    No containerd, no `swapoff`: the role prepares, Kubespray installs; and a
    `swapoff` in these nodes would hit the server. The step file says so.
    Check: `ssh node2 cat /etc/hosts`, `lsmod | grep br_netfilter`.
 4. **step4-idempotence** — run `site.yml` twice: second recap `changed=0`.
-   Change one default (add a sysctl), run with `--check --diff`, read the
-   diff, then apply. Then break it on purpose: replace the `blockinfile` by
+   Change defaults (add `nf_conntrack` and `net.core.somaxconn`), run with
+   `--check --diff`, read the diff (the template's; `ansible.posix.sysctl`
+   shows none), then apply. Then break it on purpose: replace the `blockinfile` by
    `ansible.builtin.shell: echo … >> /etc/hosts`, run twice, look at
-   `/etc/hosts`; revert. Question: which of the role's tasks report
+   `/etc/hosts`; revert, and clean up with `lineinfile state=absent`. Question: which of the role's tasks report
    `changed` in check mode but would not change anything, and why
    (handlers, `shell`)?
-5. **step5-vault** — `group_vars/all/vault.yml` encrypted with
-   `ansible-vault create`, holding `vault_ops_password`; `group_vars/all/main.yml`
+5. **step5-vault** — `inventory/group_vars/all/vault.yml` (under
+   `inventory/`, so that lab 3's `-i inventory` reads it) encrypted with
+   `ansible-vault create`, holding `vault_ops_password`; `…/all/main.yml`
    maps `ops_password: "{{ vault_ops_password }}"`; the role creates user
    `ops` with `password: "{{ ops_password | password_hash('sha512', 'm2salt') }}"`
    (fixed salt: or every run is `changed`). `git diff --staged` must show
    only ciphertext. Commit, tag `lab1`.
 
 **End state** (start of lab 2 and lab 3): `~/m2` with `ansible.cfg`,
-`inventory/hosts.yml`, `group_vars/all/{main,vault}.yml`, role
+`inventory/hosts.yml`, `inventory/group_vars/all/{main,vault}.yml`, role
 `k8s_node_prereqs`, `site.yml`; nodes prepared.
 
 ## Lab 2 — `kubernetes.core`, then Flux (session 3)
@@ -467,9 +477,9 @@ per node **(to validate)**, on the console's 30 GiB Docker PVC.
 module2/
   README.md            this file
   versions.env         pinned versions (TODO values to fill)
-  Makefile             catch-up-lab1, catch-up-lab3a
+  Makefile             catch-up-lab1 (written), catch-up-lab3a
   lab0/                Makefile, node/{Dockerfile,entrypoint}
-  lab1/                README.md, step1…5/, solution/
+  lab1/                README.md, step1…5/, solution/ (written)
   lab2/                README.md, kind.yaml, fleet/, step1…6/, solution/
   lab3/                README.md, group_vars/k8s_cluster/zz-containers.yml,
                        load, step1…9/, solution-3a/, solution/

@@ -1,0 +1,26 @@
+# roles/k8s_node_prereqs/defaults/main.yml — given, to complete (the TODOs).
+# Defaults: the knobs of the role, lowest precedence of all.
+
+# Packages a Kubernetes node needs: conntrack (kube-proxy), socat (port
+# forwarding), ipset and ebtables (kube-proxy, CNIs). Kubespray installs them
+# too; installing them first changes nothing for it.
+k8s_packages:
+  - conntrack
+  - socat
+  - ipset
+  - ebtables
+
+# Loaded at boot, from /etc/modules-load.d/k8s.conf.
+# TODO: the two modules of "Install and configure prerequisites" in
+# https://kubernetes.io/docs/setup/production-environment/container-runtimes/
+k8s_modules: []
+
+# net.* sysctls ONLY.
+# TODO: one line of comment saying why only net.* (your answer to step 2).
+k8s_sysctls:
+  net.ipv4.ip_forward: 1
+  # TODO: the two that make bridged traffic go through iptables (same page;
+  # they only exist once one of the modules above is loaded).
+
+# User for the operators (step 5); its password will come from Vault.
+ops_user: ops
