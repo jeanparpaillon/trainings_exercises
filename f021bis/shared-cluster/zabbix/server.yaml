@@ -1,0 +1,88 @@
+# Zabbix server. Trapper port 10051 is published on the server's public
+# address, so that proxies in the trainees' nested kind clusters reach it:
+#
+#   proxy (nested pod) -> 195.35.2.222:10051
+#     -> container zabbix-trapper on the server (socat, bin/zabbix forward)
+#     -> NodePort 30051 of the kind node -> this Service
+#
+# Not a cluster-internal name: a nested cluster's CoreDNS answers for
+# cluster.local itself, and its Service, pod and Docker network ranges are the
+# same as this cluster's (kind defaults), so neither a ClusterIP nor the kind
+# node's address is reachable from there. kind's port mappings are fixed at
+# creation (kind.yaml), hence the socat container rather than a mapping.
+#
+# The IP, not srv2052563.hstgr.cloud: the server's /etc/hosts maps its own
+# name to 127.0.1.1 and systemd-resolved serves that to every container on
+# it, nested pods included.
+apiVersion: v1
+kind: Service
+metadata:
+  name: zabbix-server
+spec:
+  type: NodePort
+  selector:
+    app: zabbix-server
+  ports:
+    - name: trapper
+      port: 10051
+      targetPort: trapper
+      nodePort: 30051
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zabbix-server
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate          # one server per database
+  selector:
+    matchLabels:
+      app: zabbix-server
+  template:
+    metadata:
+      labels:
+        app: zabbix-server
+    spec:
+      containers:
+        - name: server
+          image: zabbix/zabbix-server-pgsql
+          env:
+            - name: DB_SERVER_HOST
+              value: postgres
+            - name: POSTGRES_USER
+              value: zabbix
+            - name: POSTGRES_DB
+              value: zabbix
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: zabbix-db
+                  key: password
+            # A dozen proxies, each with its own LLD of nodes, pods, etc.
+            - name: ZBX_CACHESIZE
+              value: 256M
+            - name: ZBX_STARTPOLLERS
+              value: "10"
+          ports:
+            - name: trapper
+              containerPort: 10051
+          readinessProbe:
+            tcpSocket:
+              port: trapper
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {memory: 1Gi}
+        # The agent of the built-in host "Zabbix server" (127.0.0.1:10050,
+        # shared localhost), which otherwise shows as unreachable.
+        - name: agent
+          image: zabbix/zabbix-agent2
+          env:
+            - name: ZBX_HOSTNAME
+              value: Zabbix server
+            - name: ZBX_SERVER_HOST
+              value: 127.0.0.1
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {memory: 128Mi}

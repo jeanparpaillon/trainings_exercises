@@ -80,6 +80,17 @@ apply: render
 restart:
 	$(KUBECTL) -n consoles rollout restart deploy
 
+# Zabbix for every lab cluster (zabbix/): web UI at $(SRV)zabbix/, trapper
+# on 195.35.2.222:10051 (not the host name, see zabbix/server.yaml). Passwords generated and kept on the server (bin/zabbix).
+zabbix:
+	ssh $(S) 'bash -s' -- secrets < bin/zabbix
+	$(KUBECTL) apply -k zabbix
+	$(KUBECTL) -n zabbix rollout status statefulset/postgres --timeout=300s
+	$(KUBECTL) -n zabbix rollout status deploy/zabbix-server --timeout=300s
+	$(KUBECTL) -n zabbix rollout status deploy/zabbix-web --timeout=300s
+	ssh $(S) 'bash -s' -- forward < bin/zabbix
+	ssh $(S) 'bash -s' -- admin < bin/zabbix
+
 check:
 	$(KUBECTL) get nodes
 	$(KUBECTL) -n consoles get deploy,pods,ingress
@@ -100,7 +111,8 @@ help:
 	@echo "  secrets     - Create / update the console passwords from the users file"
 	@echo "  apply       - render, then apply everything"
 	@echo "  restart     - Restart every console"
+	@echo "  zabbix      - Install / upgrade Zabbix (server, web, database) for the labs"
 	@echo "  check       - Consoles answer (401 = up, behind basic auth), dind is up"
 	@echo "  help        - Show this help message"
 
-.PHONY: all sysctl create delete kubeconfig edge image render secrets apply restart check help
+.PHONY: all sysctl create delete kubeconfig edge image render secrets apply restart zabbix check help

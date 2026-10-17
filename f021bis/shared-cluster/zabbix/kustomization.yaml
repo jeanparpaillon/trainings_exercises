@@ -1,0 +1,27 @@
+# make zabbix = bin/zabbix secrets, kubectl apply -k zabbix, bin/zabbix forward
+# and admin.
+#
+# One Zabbix (server, web, PostgreSQL) for every cluster of the labs: the
+# trainees' nested kind clusters run a Zabbix proxy (and agents) that connects
+# to this server, actively, on 195.35.2.222:10051. See README.md,
+# "Zabbix".
+#
+# The Secrets (DB and Admin passwords) are not here: bin/zabbix creates them on
+# the server.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: zabbix
+resources:
+  - namespace.yaml
+  - postgres.yaml
+  - server.yaml
+  - web.yaml
+images:
+  - name: postgres
+    newTag: 17.11-alpine
+  - name: zabbix/zabbix-server-pgsql
+    newTag: alpine-7.0.31
+  - name: zabbix/zabbix-web-nginx-pgsql
+    newTag: alpine-7.0.31
+  - name: zabbix/zabbix-agent2
+    newTag: alpine-7.0.31

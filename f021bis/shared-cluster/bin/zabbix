@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# Runs ON THE SERVER (make zabbix), so the passwords never leave it:
+#
+#   ssh root@HOST 'bash -s' -- secrets  < bin/zabbix   before kubectl apply -k zabbix
+#   ssh root@HOST 'bash -s' -- forward  < bin/zabbix   public port 10051
+#   ssh root@HOST 'bash -s' -- admin    < bin/zabbix   after: Admin's password
+#
+#   secrets   Secrets zabbix/zabbix-db and zabbix/zabbix-admin, random
+#             passwords, created once and never changed: the database keeps
+#             the password it was initialised with.
+#   forward   container zabbix-trapper (socat): the server's 0.0.0.0:10051 to
+#             the kind node's NodePort 30051, where kind.yaml has no mapping
+#             for it (see zabbix/server.yaml). Recreated on every run.
+#   admin     replaces the default password of the web user Admin (`zabbix`)
+#             by the one of Secret zabbix/zabbix-admin, if it is still the
+#             default; prints where to read it.
+#
+#   CTX       kubectl context (default kind-training-f021bis)
+#   NODE      kind node       (default training-f021bis-control-plane)
+#   URL       frontend        (default https://$(hostname -f)/zabbix/)
+set -euo pipefail
+
+CTX=${CTX:-kind-training-f021bis}
+NODE=${NODE:-training-f021bis-control-plane}
+URL=${URL:-https://$(hostname -f)/zabbix/}
+SOCAT_IMAGE=alpine/socat:1.8.1.1
+k() { kubectl --context "$CTX" "$@"; }
+
+secret() {   # secret <name>: create it with a random password unless it exists
+  if k -n zabbix get secret "$1" >/dev/null 2>&1; then
+    echo "secret $1: unchanged"
+  else
+    k -n zabbix create secret generic "$1" \
+      --from-file=password=<(openssl rand -base64 24 | tr -d '/+=' | head -c 24) >/dev/null
+    echo "secret $1: created"
+  fi
+}
+
+# No jq on the server: the two answers used are matched with sed / grep.
+api() {      # api <token|""> <json>: one JSON-RPC call, the response on stdout
+  curl -fsS "${URL}api_jsonrpc.php" -H 'Content-Type: application/json-rpc' \
+    ${1:+-H "Authorization: Bearer $1"} -d "$2"
+}
+
+case ${1:-} in
+  secrets)
+    k create namespace zabbix --dry-run=client -o yaml | k apply -f - >/dev/null
+    secret zabbix-db
+    secret zabbix-admin
+    ;;
+  forward)
+    docker rm -f zabbix-trapper >/dev/null 2>&1 || true
+    docker run -d --name zabbix-trapper --restart unless-stopped \
+      --network kind -p 10051:10051 "$SOCAT_IMAGE" \
+      TCP-LISTEN:10051,fork,reuseaddr "TCP:$NODE:30051" >/dev/null
+    echo "forward: 0.0.0.0:10051 -> $NODE:30051"
+    ;;
+  admin)
+    pw=$(k -n zabbix get secret zabbix-admin -o jsonpath='{.data.password}' | base64 -d)
+    login() { api "" "{\"jsonrpc\":\"2.0\",\"method\":\"user.login\",\"id\":1,\"params\":{\"username\":\"Admin\",\"password\":\"$1\"}}" | sed -n 's/.*"result":"\([^"]*\)".*/\1/p'; }
+    if [ -n "$(login "$pw")" ]; then
+      echo "admin: password already set"
+    elif tok=$(login zabbix) && [ -n "$tok" ]; then
+      api "$tok" "{\"jsonrpc\":\"2.0\",\"method\":\"user.update\",\"id\":1,\"params\":{\"userid\":\"1\",\"current_passwd\":\"zabbix\",\"passwd\":\"$pw\"}}" \
+        | grep -q '"result"'
+      echo "admin: password set"
+    else
+      echo "admin: cannot log in, with the default nor the Secret's password" >&2
+      exit 1
+    fi
+    echo "  $URL, user Admin, password: kubectl -n zabbix get secret zabbix-admin -o jsonpath='{.data.password}' | base64 -d"
+    ;;
+  *)
+    echo "usage: bin/zabbix secrets|forward|admin" >&2
+    exit 2
+    ;;
+esac

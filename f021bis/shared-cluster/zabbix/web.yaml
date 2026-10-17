@@ -1,0 +1,101 @@
+# Zabbix frontend at https://srv2052563.hstgr.cloud/zabbix/, behind Traefik
+# like the consoles. The frontend only uses relative URLs, so it runs at / in
+# the container and Traefik strips the prefix; /zabbix without the slash is
+# redirected, or those relative URLs would resolve under /.
+apiVersion: v1
+kind: Service
+metadata:
+  name: zabbix-web
+spec:
+  selector:
+    app: zabbix-web
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zabbix-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zabbix-web
+  template:
+    metadata:
+      labels:
+        app: zabbix-web
+    spec:
+      containers:
+        - name: web
+          image: zabbix/zabbix-web-nginx-pgsql
+          env:
+            - name: ZBX_SERVER_HOST
+              value: zabbix-server
+            - name: ZBX_SERVER_NAME
+              value: f021bis
+            - name: DB_SERVER_HOST
+              value: postgres
+            - name: POSTGRES_USER
+              value: zabbix
+            - name: POSTGRES_DB
+              value: zabbix
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: zabbix-db
+                  key: password
+            - name: PHP_TZ
+              value: Europe/Paris
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {memory: 512Mi}
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: slash
+spec:
+  redirectRegex:
+    regex: ^(https?://[^/]+/zabbix)$
+    replacement: ${1}/
+    permanent: true
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: strip
+spec:
+  stripPrefix:
+    prefixes: [/zabbix]
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: zabbix-web
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.middlewares: zabbix-slash@kubernetescrd,zabbix-strip@kubernetescrd
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: srv2052563.hstgr.cloud
+      http:
+        paths:
+          - path: /zabbix
+            pathType: Prefix
+            backend:
+              service:
+                name: zabbix-web
+                port:
+                  name: http

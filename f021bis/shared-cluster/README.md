@@ -14,6 +14,7 @@ web console per trainee), with two differences:
 | Your namespace | `<name>`; you are `cluster-admin` anyway |
 | Lab applications | `http://<app>.<name>.195.35.2.222.nip.io/` (plain HTTP, IngressClass `traefik`) |
 | Storage | `local-path` (`StorageClass` `standard`) |
+| Zabbix (module 3) | web UI `https://srv2052563.hstgr.cloud/zabbix/`; server (proxies, active) `195.35.2.222:10051` |
 
 ## In the console
 
@@ -41,6 +42,8 @@ they survive a console restart, but kind clusters come back stopped —
 | [`console/`](console/) | console image: ttyd, kubectl, kind, helm, etcdctl/etcdutl, docker CLI, ansible |
 | [`bin/render`](bin/render) | `trainees/` from the trainee names (git-ignored) |
 | [`bin/secrets`](bin/secrets) | runs on the server: console passwords from `/root/users/consoles.txt` |
+| [`zabbix/`](zabbix/) | Zabbix 7.0 LTS for every lab cluster: PostgreSQL, server (+ agent2 sidecar), web, Ingress `/zabbix/` |
+| [`bin/zabbix`](bin/zabbix) | runs on the server: Zabbix passwords, the `zabbix-trapper` port forward, Admin's password |
 
 The passwords never leave the server: `make render` only reads the first
 column of `consoles.txt`, `make secrets` runs on the server.
@@ -58,6 +61,7 @@ make image         # console image, built on the server, loaded into kind
 make secrets       # console passwords
 make apply         # render trainees/ + kubectl apply -k .
 make check         # each console answers 401 (basic auth), dind is up
+make zabbix        # Zabbix for module 3, see below
 ```
 
 Day to day:
@@ -71,9 +75,38 @@ Day to day:
   objects by hand (`kubectl -n consoles delete all,pvc,ingress,sa,secret -l console=<name>`,
   `kubectl delete ns <name>`).
 
+## Zabbix
+
+One Zabbix for the room (`make zabbix`, namespace `zabbix`): the trainees'
+lab clusters each run a Zabbix **proxy** (and agents) that connects to it,
+actively. Web UI at `https://srv2052563.hstgr.cloud/zabbix/`, user `Admin`;
+the password is generated on the first run and kept in the cluster:
+
+```sh
+kubectl --kubeconfig=kubeconfig -n zabbix get secret zabbix-admin -o jsonpath='{.data.password}' | base64 -d
+```
+
+From a lab cluster, the server is **`195.35.2.222:10051`** — the IP, not the
+host name, which resolves to `127.0.1.1` inside every container on the server
+(its `/etc/hosts`). The path is a `socat` container on the server,
+`zabbix-trapper`, from `0.0.0.0:10051` to the kind node's NodePort 30051:
+kind's port mappings are fixed at creation, and nothing cluster-internal
+(Service name, ClusterIP, node address) is reachable from a nested cluster,
+whose DNS domain and address ranges are the same as this one's.
+
+`make zabbix` is re-runnable: Secrets are created once (the database keeps
+the password it was initialised with), the forward is recreated, the Admin
+password is only set while it is still the default. Version bump: the tags
+in [`zabbix/kustomization.yaml`](zabbix/kustomization.yaml), then `make
+zabbix`; the server upgrades the database schema itself, within a major
+version. Proxies in the labs must be the same major version (7.0).
+
+Port 10051 is open to the Internet. The server only accepts data from
+proxies and hosts declared in it; keep autoregistration off, or use PSK.
+
 ## Size and security
 
-- The server has 4 CPUs and 15 GiB. A kind node takes about 1 CPU at start
+- The server has 4 CPUs and 15 GiB. Zabbix takes about 0.5 GiB of it. A kind node takes about 1 CPU at start
   and 1–2 GiB; each console also pulls its own `kindest/node` (~1 GB). Count
   on one or two small clusters per trainee at the same time, not more.
 - The `dind` sidecar is privileged, inside a kind node that is itself a
