@@ -1,0 +1,47 @@
+# Helm values of the `headlamp` release (make headlamp). This file is the
+# whole set: never --reuse-values. Same setup as f021's Headlamp, minus the
+# per-trainee `headlamp` ServiceAccounts and the Flux plugin.
+#
+# https://srv2052563.hstgr.cloud/headlamp/. Headlamp's own ServiceAccount
+# gets no cluster role (clusterRoleBinding.create: false): a trainee logs in
+# with the token of their console's ServiceAccount, cluster-admin like
+# everything they do here (base/trainees-cluster-admin.yaml). From the
+# console:
+#
+#   kubectl -n consoles create token console-$NS --duration=168h
+#
+# Headlamp sees this cluster only, not the trainees' nested kind clusters
+# (unreachable from here, see README.md "Zabbix").
+clusterRoleBinding:
+  create: false
+config:
+  # Headlamp serves under the prefix itself: no strip-prefix middleware. But
+  # it answers 404 to /headlamp without the slash, hence `slash` below (as
+  # zabbix/web.yaml).
+  baseURL: /headlamp
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.middlewares: headlamp-slash@kubernetescrd
+  hosts:
+    - host: srv2052563.hstgr.cloud
+      paths:
+        - path: /headlamp
+          type: Prefix
+resources:
+  requests: {cpu: 50m, memory: 64Mi}
+  limits: {memory: 256Mi}
+extraManifests:
+  - |
+    apiVersion: traefik.io/v1alpha1
+    kind: Middleware
+    metadata:
+      name: slash
+      namespace: headlamp
+    spec:
+      redirectRegex:
+        regex: ^(https?://[^/]+/headlamp)$
+        replacement: ${1}/
+        permanent: true

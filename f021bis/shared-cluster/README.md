@@ -14,6 +14,7 @@ web console per trainee), with two differences:
 | Your namespace | `<name>`; you are `cluster-admin` anyway |
 | Lab applications | `http://<app>.<name>.195.35.2.222.nip.io/` (plain HTTP, IngressClass `traefik`) |
 | Storage | `local-path` (`StorageClass` `standard`) |
+| Headlamp | `https://srv2052563.hstgr.cloud/headlamp/`, token from the console: `kubectl -n consoles create token console-$NS --duration=168h` |
 | Zabbix (module 3) | web UI `https://srv2052563.hstgr.cloud/zabbix/`; server (proxies, active) `195.35.2.222:10051` |
 
 ## In the console
@@ -37,6 +38,7 @@ they survive a console restart, but kind clusters come back stopped —
 | --- | --- |
 | [`kind.yaml`](kind.yaml) | the cluster: API on `0.0.0.0:6443` with the host name in its SANs, NodePorts 30080/30443 on the server's 80/443 |
 | [`traefik-values.yaml`](traefik-values.yaml) | full Helm values of the `traefik` release (TLS, Let's Encrypt) |
+| [`headlamp-values.yaml`](headlamp-values.yaml) | full Helm values of the `headlamp` release: `/headlamp/`, login with the console's ServiceAccount token |
 | [`base/`](base/) | namespace `consoles`, cluster-admin for trainees, HTTP→HTTPS redirect |
 | [`templates/trainee.yaml.tmpl`](templates/trainee.yaml.tmpl) | everything per trainee: namespace, admin RoleBinding, console (ttyd + dind), PVCs, Service, Ingress |
 | [`console/`](console/) | console image: ttyd, kubectl, kind, helm, etcdctl/etcdutl, docker CLI, ansible |
@@ -57,6 +59,7 @@ make sysctl        # inotify limits for the nested kind clusters, once per serve
 make create        # kind cluster on the server
 make kubeconfig    # ./kubeconfig, cluster-admin, git-ignored
 make edge          # Traefik
+make headlamp      # Headlamp, after edge (Traefik's Middleware CRD)
 make image         # console image, built on the server, loaded into kind
 make secrets       # console passwords
 make apply         # render trainees/ + kubectl apply -k .

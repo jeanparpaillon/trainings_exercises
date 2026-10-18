@@ -15,8 +15,9 @@ KUBECTL := kubectl --kubeconfig=$(KUBECONFIG_FILE) --context=$(NAME)
 
 # Bump the tag on every change to console/: kind-loaded images are never
 # re-pulled, a new tag is what rolls the consoles.
-CONSOLE_IMAGE   := f021bis-console:2
-TRAEFIK_VERSION := 41.7.1
+CONSOLE_IMAGE    := f021bis-console:2
+TRAEFIK_VERSION  := 41.7.1
+HEADLAMP_VERSION := 0.46.0
 
 export HOST CONSOLE_IMAGE
 
@@ -56,6 +57,15 @@ edge:
 	  helm upgrade --install traefik traefik/traefik --kube-context kind-$(NAME) \
 	    -n traefik --create-namespace --version $(TRAEFIK_VERSION) \
 	    -f $(REMOTE)/traefik-values.yaml --wait"
+
+# Headlamp at $(SRV)headlamp/: see headlamp-values.yaml for the login token.
+headlamp:
+	ssh $(S) mkdir -p $(REMOTE)
+	scp headlamp-values.yaml $(S):$(REMOTE)/headlamp-values.yaml
+	ssh $(S) "helm repo add headlamp https://kubernetes-sigs.github.io/headlamp/ --force-update >/dev/null && \
+	  helm upgrade --install headlamp headlamp/headlamp --kube-context kind-$(NAME) \
+	    -n headlamp --create-namespace --version $(HEADLAMP_VERSION) \
+	    -f $(REMOTE)/headlamp-values.yaml --wait"
 
 # Builds the console image on the server (context streamed over ssh) and
 # loads it into the kind node.
@@ -106,6 +116,7 @@ help:
 	@echo "  delete      - Delete it (and every console home with it)"
 	@echo "  kubeconfig  - Fetch a cluster-admin kubeconfig into ./$(KUBECONFIG_FILE)"
 	@echo "  edge        - Install / upgrade Traefik"
+	@echo "  headlamp    - Install / upgrade Headlamp ($(SRV)headlamp/)"
 	@echo "  image       - Build the console image on the server and load it into kind"
 	@echo "  render      - Generate trainees/ from the server's users file"
 	@echo "  secrets     - Create / update the console passwords from the users file"
@@ -115,4 +126,4 @@ help:
 	@echo "  check       - Consoles answer (401 = up, behind basic auth), dind is up"
 	@echo "  help        - Show this help message"
 
-.PHONY: all sysctl create delete kubeconfig edge image render secrets apply restart zabbix check help
+.PHONY: all sysctl create delete kubeconfig edge headlamp image render secrets apply restart zabbix check help
