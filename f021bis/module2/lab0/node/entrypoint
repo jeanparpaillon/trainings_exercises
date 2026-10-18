@@ -1,0 +1,83 @@
+#!/bin/bash
+# Entrypoint of m2-node: what a node in a container needs before systemd
+# starts. Trimmed from kind's (kind v0.33.0, images/base/files/usr/local/bin/
+# entrypoint, Copyright 2019 The Kubernetes Authors, Apache License 2.0):
+# fix_mount, fix_machine_id, fix_product_uuid, select_iptables and the DNS
+# half of enable_network_magic. Left out: what only kind's own kubeadm setup
+# needs (containerd snapshotter, /kubelet cgroup root, certificate re-signing
+# on IP change — our IPs are fixed).
+
+set -o errexit -o nounset -o pipefail
+
+log() { echo "m2-node: $*" >&2; }
+
+# systemd in a container wants /sys read-only (https://systemd.io/CONTAINER_INTERFACE/);
+# --privileged made it read-write. /sys/fs/cgroup is its own mount and stays
+# writable. And mount propagation, for the kubelet's volumes.
+fix_mount() {
+  mount -o remount,ro /sys
+  mount --make-rshared /
+}
+
+# Unique per node: the kubelet reports it, CNIs key on it.
+fix_machine_id() {
+  rm -f /etc/machine-id
+  systemd-machine-id-setup >/dev/null
+}
+
+# Every container reads the server's DMI, hence the same product_uuid on every
+# node. Kept across restarts, on the /var volume.
+fix_product_uuid() {
+  local uuid=/var/lib/m2-node/product_uuid
+  mkdir -p "$(dirname "$uuid")"
+  [[ -f $uuid ]] || cat /proc/sys/kernel/random/uuid > "$uuid"
+  for f in /sys/class/dmi/id/product_uuid /sys/devices/virtual/dmi/id/product_uuid; do
+    [[ -f $f ]] && mount -o ro,bind "$uuid" "$f"
+  done
+  return 0
+}
+
+# Use the iptables backend Docker used for this container's rules.
+select_iptables() {
+  local legacy nft mode
+  legacy=$( (iptables-legacy-save || true; ip6tables-legacy-save || true) 2>/dev/null | grep -c '^-' || true)
+  nft=$( (timeout 5 sh -c 'iptables-nft-save; ip6tables-nft-save' || true) 2>/dev/null | grep -c '^-' || true)
+  if [[ $legacy -ge $nft ]]; then mode=legacy; else mode=nft; fi
+  log "iptables: $mode"
+  update-alternatives --set iptables "/usr/sbin/iptables-$mode" >/dev/null
+  update-alternatives --set ip6tables "/usr/sbin/ip6tables-$mode" >/dev/null
+}
+
+# Docker's embedded DNS is 127.0.0.11, reachable from the node itself but not
+# from its pods (CoreDNS forwards to the node's resolv.conf). Expose it on the
+# network's gateway address instead, for pod traffic too.
+fix_dns() {
+  local dns=127.0.0.11 gw
+  gw=$(ip -4 route show default | cut -d' ' -f3)
+  iptables-save \
+    | sed -e "s/-d ${dns}/-d ${gw}/g" \
+          -e 's/-A OUTPUT \(.*\) -j DOCKER_OUTPUT/\0\n-A PREROUTING \1 -j DOCKER_OUTPUT/' \
+          -e "s/--to-source :53/--to-source ${gw}:53/g" \
+          -e "s/p -j DNAT --to-destination ${dns}/p --dport 53 -j DNAT --to-destination ${dns}/g" \
+    | iptables-restore
+  # Rewritten in place: /etc/resolv.conf is a bind mount.
+  local conf
+  conf=$(sed -e "s/${dns}/${gw}/g" /etc/resolv.conf)
+  echo "$conf" > /etc/resolv.conf
+  log "DNS: ${gw}"
+  # Kubespray points the kubelet of Ubuntu nodes at systemd-resolved's file
+  # (roles/kubernetes/node/vars/ubuntu-24.yml, not overridable from the
+  # inventory). No systemd-resolved here — it would fight Docker over
+  # /etc/resolv.conf — so provide the file it would write. /run is a tmpfs:
+  # recreated at every start.
+  mkdir -p /run/systemd/resolve
+  echo "$conf" > /run/systemd/resolve/resolv.conf
+}
+
+fix_mount
+fix_machine_id
+fix_product_uuid
+select_iptables
+fix_dns
+
+exec "$@"

@@ -1,0 +1,47 @@
+# inventory/group_vars/k8s_cluster/zz-containers.yml — given.
+#
+# Overrides that exist ONLY because our nodes are containers on a shared
+# server (lab 1 step 2). Each one was found by a failed run, or by reading what
+# Kubespray would do to the server's kernel. On VMs or bare metal, delete this
+# file. Named zz- so that it is read last in the directory, after
+# k8s-cluster.yml: the same variable set twice in one group, the last file wins.
+
+# The kubelet refuses to start with swap, so Kubespray runs `swapoff -a` —
+# which, in a container, switches off the SERVER's swap. Let the kubelet
+# tolerate swap instead (it is reported as a kubeadm preflight warning).
+kubelet_fail_swap_on: false
+
+# Otherwise Kubespray sets kernel.panic, kernel.panic_on_oops,
+# vm.overcommit_memory, vm.panic_on_oom, kernel.keys.* — global, for the whole
+# server — and the kubelet refuses to start unless they are set.
+kubelet_protect_kernel_defaults: false
+
+# Kubespray raises these to a floor when they are lower (sysctl_minimum_values,
+# in its role vars). All but somaxconn are global: a floor of 0 means "never
+# raise". The trainer sets the server's values instead, once.
+additional_sysctl_min:
+  fs.inotify.max_user_instances: 0
+  fs.inotify.max_user_watches: 0
+  kernel.pid_max: 0
+  fs.aio-max-nr: 0
+  vm.max_map_count: 0
+  net.netfilter.nf_conntrack_max: 0
+  net.core.netdev_max_backlog: 0
+
+# kube-proxy would size the conntrack table from the server's CPU count, for
+# the whole server. 0: leave it as it is (what kind does).
+kube_proxy_conntrack_max_per_core: 0
+
+# Docker bind-mounts /etc/resolv.conf into the container: Kubespray's edit
+# fails with "Device or resource busy" (lab 1's /etc/hosts, again). The node
+# image already points it at a resolver that pods can reach.
+resolvconf_mode: none
+
+# kubeadm cannot read the kernel config from inside a container (no
+# /proc/config.gz, no `configs` module). Module 1 ignored the same check.
+kubeadm_ignore_preflight_errors:
+  - SystemVerification
+
+# Downloads go to /tmp/releases by default: a tmpfs in our nodes, i.e. ~460 MB
+# of RAM per node, lost at every restart. /var is the node's volume.
+local_release_dir: /var/tmp/releases

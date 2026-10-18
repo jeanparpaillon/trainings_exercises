@@ -1,0 +1,59 @@
+# Checked, not fixed: the nodes are containers on the server's kernel, so
+# `swapoff -a` here would switch off the server's swap, for the whole room.
+- name: No swap
+  ansible.builtin.assert:
+    that: ansible_swaptotal_mb == 0
+    fail_msg: >-
+      {{ inventory_hostname }} has {{ ansible_swaptotal_mb }} MiB of swap and
+      the kubelet refuses to start with swap by default. This role does not
+      run swapoff: on a node in a container, the swap is the server's, and
+      switching it off is the server's administrator's decision.
+
+- name: Packages
+  ansible.builtin.apt:
+    name: "{{ k8s_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Kernel modules, at boot
+  ansible.builtin.template:
+    src: k8s.conf.j2
+    dest: /etc/modules-load.d/k8s.conf
+    mode: "0644"
+  notify: Load kernel modules
+
+# Now, not at the end of the play: the net.bridge.* sysctls below only exist
+# once br_netfilter is loaded.
+- name: Kernel modules, now
+  ansible.builtin.meta: flush_handlers
+
+- name: Sysctls
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_file: /etc/sysctl.d/99-k8s.conf
+    reload: true
+  loop: "{{ k8s_sysctls | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}={{ item.value }}"
+
+# Hosts without an address (lab 2's localhost) are left out.
+- name: Every node of the inventory in /etc/hosts
+  ansible.builtin.blockinfile:
+    path: /etc/hosts
+    marker: "# {mark} m2 inventory"
+    block: |
+      {% for host in groups['all'] if hostvars[host].ansible_host is defined %}
+      {{ hostvars[host].ansible_host }} {{ host }}
+      {% endfor %}
+    # Docker bind-mounts /etc/hosts into the container: it cannot be replaced
+    # by a rename, only rewritten in place. Kubespray does the same.
+    unsafe_writes: true
+
+# A fixed salt, or the hash changes, and the task reports changed, every run.
+- name: User {{ ops_user }}
+  ansible.builtin.user:
+    name: "{{ ops_user }}"
+    shell: /bin/bash
+    password: "{{ ops_password | password_hash('sha512', 'm2salt') }}"

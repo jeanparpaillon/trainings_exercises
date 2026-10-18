@@ -1,0 +1,27 @@
+#!/bin/bash
+# Lab 3c: one request every 0.2 s to `web`'s NodePort, alternately on each
+# node, from the console — outside the cluster, like users. Prints only the
+# failures, with a timestamp and the node; a summary every minute and at the
+# end (Ctrl-C, or DURATION seconds).
+#
+#   ~/trainings_exercises/f021bis/module2/lab3/load            # node1 and node3
+#   TARGETS="node1" DURATION=600 .../lab3/load
+TARGETS=${TARGETS:-node1 node3}
+PORT=${PORT:-30082}
+DURATION=${DURATION:-0}
+read -r -a targets <<< "$TARGETS"
+ok=0 ko=0 start=$(date +%s) last=$start i=0
+summary() { echo "$(date +%T) $((ok+ko)) requests, $ko failed"; }
+trap 'summary; exit' INT TERM
+while :; do
+  t=${targets[i++ % ${#targets[@]}]}
+  if code=$(curl -s -o /dev/null -m 1 -w '%{http_code}' "http://$t:$PORT/") && [[ $code == 200 ]]; then
+    ok=$((ok+1))
+  else
+    ko=$((ko+1)); echo "$(date +%T.%3N) FAIL $t ${code:-000}"
+  fi
+  now=$(date +%s)
+  (( now - last >= 60 )) && { summary; last=$now; }
+  (( DURATION > 0 && now - start >= DURATION )) && { summary; exit; }
+  sleep 0.2
+done

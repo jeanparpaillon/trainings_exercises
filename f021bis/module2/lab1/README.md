@@ -41,8 +41,8 @@ the solution's vault to your `~/.vault_pass`, runs `site.yml`).
 
 The solution was run against three `ubuntu:24.04` systemd + sshd containers
 (privileged, `/lib/modules` mounted, as the spec describes the lab 0 nodes)
-with ansible-core 2.17, then 2.19. Not yet on the f021bis consoles: `lab0/` does not
-exist yet.
+with ansible-core 2.17, then 2.19, and again on `lab0`'s own nodes during
+lab 3's dry run. Not yet on the f021bis consoles.
 
 - **A missing `~/.vault_pass` breaks every command** once `ansible.cfg`
   names it, `ansible-inventory` included — hence step 1 creates it.

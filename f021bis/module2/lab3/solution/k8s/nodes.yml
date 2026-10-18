@@ -1,0 +1,17 @@
+# Step 1: the smallest playbook against the API.
+- name: Nodes of the cluster
+  hosts: k8s_api
+  gather_facts: false
+  module_defaults:
+    group/kubernetes.core.k8s:
+      kubeconfig: "{{ k8s_kubeconfig }}"
+      context: "{{ k8s_context }}"
+  tasks:
+    - name: Read the nodes
+      kubernetes.core.k8s_info:
+        kind: Node
+      register: nodes
+
+    - name: Their names
+      ansible.builtin.debug:
+        msg: "{{ nodes.resources | map(attribute='metadata.name') | list }}"

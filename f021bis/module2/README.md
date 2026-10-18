@@ -8,13 +8,12 @@ slides it belongs to, and the slides point back with
 `📖 module2/README.md — Lab N`.
 
 > **Status: specification.** This README describes what each lab must
-> contain and check. **Labs 1 and 2 are written** (`lab1/`, `lab2/`,
-> `make catch-up-lab1`) and their solutions were run locally (container
-> nodes, kind), not yet on the consoles; `lab0/` and lab 3 are not written.
-> Each lab's README ends with what that run found. Items marked **(to validate)**
-> are assumptions to confirm on the first dry run. The biggest one is
-> Kubespray on container nodes (see [Nodes](#nodes--requirements-for-lab0)):
-> settle it first, before any step file is written.
+> contain and check. **Everything is written** (`lab0/` to `lab3/`, the
+> catch-up targets) and was run end to end on a laptop (2026-10-17/18):
+> **Kubespray runs on container nodes**, with the overrides of
+> `lab3/group_vars/k8s_cluster/zz-containers.yml`. Not yet on the server
+> and the consoles. Each lab's README ends with what that run found; items
+> still marked **(to validate)** need the server.
 
 | | Lab | Session | ~ |
 | --- | --- | --- | --- |
@@ -75,7 +74,7 @@ console.
 | `make -C lab0 image` | builds `m2-node:latest` (Dockerfile in `lab0/node/`) |
 | `make -C lab0 up` | network `m2` (`NODE_SUBNET`), `node1`…`node3` at **fixed IPs** `.11`–`.13`, their names in the console's `/etc/hosts`, `~/.ssh/id_ed25519` created if missing and authorized for user `ansible` |
 | `make -C lab0 down` / `reset` | delete the nodes (and their volumes) / delete and recreate them blank |
-| `make -C lab0 predownload` | trainer, the day before: runs Kubespray's `cluster.yml --tags download` on the nodes so that binaries and images are already there **(to validate: that the cache survives and that cluster.yml then skips the downloads)** |
+| `make -C lab0 predownload` | trainer, the day before: runs Kubespray's `cluster.yml --tags download` with `lab3/solution-3a`'s inventory, so that binaries (`/var/tmp/releases`, on the node's volume since `zz-containers.yml`) and images are already there. With the binaries there, `cluster.yml` took 8 min instead of 44 on the dry run **(to validate: the `--tags download` run itself)** |
 | `make -C lab0 check` | venv, collections, Kubespray tag, nodes up, `ssh ansible@node1 true` |
 | `make -C lab0 pull-consoles` | trainer, from their machine: `image up` in every console before session 1 |
 
@@ -104,18 +103,23 @@ supported OS), with:
 The nodes are privileged containers sharing the **server's kernel**. What
 Kubespray does to the kernel, it does to the server, for the whole room:
 
-- **swap**: Kubespray runs `swapoff -a` when it sees swap
-  (`ansible_swaptotal_mb`, which is the host's). The server must have **no
-  swap** before session 4 **(to validate: `swapon --show` on the server)**;
-- **modules**: `modprobe` loads into the server kernel (`br_netfilter`,
-  `overlay`, the CNI's). Harmless, but load them on the server beforehand so
-  nothing depends on it;
-- **sysctls**: `net.*` are per network namespace (the node's own);
-  `vm.*`, `kernel.*`, `fs.*` that Kubespray sets are **global**. List them on
-  the dry run and record them here **(to validate)**;
-- **conntrack**: kube-proxy sets `nf_conntrack_max` unless told not to; kind
-  sets `conntrack.maxPerCore: 0` for that reason. Find Kubespray's
-  equivalent **(to validate)**.
+- **swap**: Kubespray runs `swapoff -a` (`kubelet_fail_swap_on`, default
+  true). Overridden in `zz-containers.yml`: the kubelet tolerates swap (a
+  kubeadm preflight warning). The dry run ran with 4.5 GiB of swap in use,
+  untouched;
+- **modules**: `modprobe` loads into the server kernel: `br_netfilter`,
+  `overlay`, `nf_conntrack`, `vxlan` (flannel). Harmless; load them on the
+  server beforehand (`/etc/modules-load.d/`) so nothing depends on it;
+- **sysctls**: `net.*` are per network namespace (the node's own). Kubespray
+  would set `kernel.panic`, `kernel.panic_on_oops`, `vm.overcommit_memory`,
+  `vm.panic_on_oom`, `kernel.keys.*` (`kubelet_protect_kernel_defaults`) and
+  raise `fs.inotify.*`, `fs.aio-max-nr`, `kernel.pid_max`,
+  `vm.max_map_count`, `nf_conntrack_max`, `net.core.netdev_max_backlog`
+  (`sysctl_minimum_values`, role vars). Both neutralised in
+  `zz-containers.yml`; on the dry run no global sysctl changed. If the room
+  hits limits (inotify, `max_map_count`), the trainer raises them on the
+  server;
+- **conntrack**: `kube_proxy_conntrack_max_per_core: 0`, as kind does.
 
 Lab 1 step 2 is built on exactly this: what a container shares with its
 host is a question for the trainees before Kubespray makes it a problem.
@@ -162,8 +166,9 @@ Last resort: lab 3 demonstrated by the trainer on VMs, lab 3c's
 
 **Catch-up** (from `module2/`): `make catch-up-lab1` copies `lab1/solution/`
 into `~/m2` (moving the existing one aside) and runs it;
-`make catch-up-lab3a` does the same with `lab3/solution-3a/` and runs
-`cluster.yml` (~ the lab's duration, **to validate**). Lab 2 needs no
+`make catch-up-lab3a` recreates the nodes blank (`lab0 reset`), does the
+same with `lab3/solution-3a/` and runs `site.yml` and `cluster.yml` (~10 min
+with the downloads cached; `reset` deletes that cache: 40+ min without). Lab 2 needs no
 catch-up: `iac` is rebuilt in step 1 in 2 minutes. Keep these in sync when
 an end state changes.
 
@@ -205,8 +210,9 @@ Start: `make -C lab0 check` green (the trainer ran `pull-consoles`).
    `remote_user = ansible`, `become = true`, `roles_path = ./roles`,
    `vault_password_file = ~/.vault_pass`, `host_key_checking = False` (lab
    nodes are recreated), `interpreter_python = auto_silent`. `inventory/hosts.yml` in YAML, the groups of
-   Kubespray's sample inventory at `KUBESPRAY_VERSION` **(to validate the
-   exact names in that release)**: `kube_control_plane: node1`, `etcd:
+   Kubespray's sample inventory at `KUBESPRAY_VERSION` (v2.32.0:
+   `kube_control_plane`, `etcd`, `kube_node`; `k8s_cluster` is built by
+   `roles/dynamic_groups`, ours is explicit, no conflict): `kube_control_plane: node1`, `etcd:
    node1`, `kube_node: node2`, `k8s_cluster` = children of the first ones;
    `node3` in a group `spare`. Each host has `ansible_host` = its fixed IP.
    Check: `ansible-inventory --graph`, `ansible all -m ansible.builtin.ping`.
@@ -369,8 +375,10 @@ Slides: *Session 2* (`ansible_k8s.md`, Kubespray part), *Session 4*
 | | | 8 `upgrade-cluster.yml`, `KUBE_FROM` → `KUBE_TO` | 30 min |
 | | | 9 the whole chain: lab 2's `flux.yml` on `spray` | 10 min |
 
-Durations of steps 3 and 8 are **(to validate)**: the dry run measures them
-with `predownload` done, and the slides quote that number.
+Measured on the dry run (laptop): step 3 `cluster.yml` 8 min with the
+binaries cached (44 min without), step 5 4 min, step 6 1 min, step 8
+`upgrade-cluster.yml` 16 min with 1 failed request out of ~4,300. Quoted
+in the slides' notes.
 
 ### 3a — deploy (session 4)
 
@@ -379,7 +387,11 @@ with `predownload` done, and the slides quote that number.
    `inventory/sample/group_vars/` into `~/m2/inventory/group_vars/`
    **merging** with lab 1's `group_vars/all/` (the step file says which
    files collide). Lab 1's `hosts.yml` is the inventory. Questions: which
-   group gets etcd? what is `k8s_cluster` for?
+   group gets etcd? what is `k8s_cluster` for? Our `ansible.cfg` takes
+   Kubespray's settings (`roles_path`/`library` to `~/kubespray`, the fact
+   cache for step 5, `[inventory] ignore_patterns = artifacts`,
+   pipelining): its playbooks run from `~/m2`, so `~/kubespray/ansible.cfg`
+   does not apply.
 2. **step2-vars** — edit `group_vars/k8s_cluster/k8s-cluster.yml` and
    `addons.yml`, each choice explained in the step file and on the slide:
 
@@ -387,16 +399,19 @@ with `predownload` done, and the slides quote that number.
    | --- | --- | --- |
    | `kube_version` | `KUBE_FROM` | lab 3c upgrades it |
    | `container_manager` | `containerd` | the default; the only one module 1 used |
-   | `kube_network_plugin` | `flannel` **(to validate: VXLAN in nested containers; else `calico` in VXLAN mode)** | lightest; no BGP |
+   | `kube_network_plugin` | `flannel` (VXLAN works in nested containers: validated) | lightest; no BGP |
    | `kube_proxy_mode` | `iptables` | `ipvs` (default) needs IPVS modules in the server kernel |
    | `enable_nodelocaldns` | `false` | a dummy interface + link-local IP per node: one more kernel dependency, and memory |
    | `etcd_deployment_type` | `host` (default) | etcd as a systemd unit — contrast with kind/kubeadm's static pod |
    | `kubeconfig_localhost` | `true` | `admin.conf` into `inventory/artifacts/` |
-   | `cluster_name` | `spray.local` | |
+   | `cluster_name` | `spray.local` | the context name, certificates |
+   | `dns_domain` | `cluster.local` | defaults to `cluster_name`; Flux's `install.yaml` hardcodes `svc.cluster.local` (step 9 failed on the dry run) |
+   | `node1` in `kube_node` (`hosts.yml`) | | untainted control plane: with two nodes, 3c drains one while the other keeps the pods |
 
    Given: `lab3/group_vars/k8s_cluster/zz-containers.yml`, the overrides
-   that only exist because nodes are containers (preflight errors to ignore,
-   conntrack, …, **filled at the dry run**), each with a comment. Commit
+   that only exist because nodes are containers (swap, global sysctls,
+   conntrack, `resolvconf_mode: none`, `SystemVerification`,
+   `local_release_dir` off the `/tmp` tmpfs), each with a comment. Commit
    *before* running: the cluster's definition is the commit.
 3. **step3-cluster** — `ansible-playbook -i inventory ~/kubespray/cluster.yml`
    (become comes from `ansible.cfg`), `time` in front of it. While it runs:
@@ -413,15 +428,15 @@ with `predownload` done, and the slides quote that number.
    pods), what is not (etcd, CNI, how the node got its binaries). Commit,
    tag `lab3a`.
 
-**End state 3a**: `spray` at `KUBE_FROM`, `node1` control plane + etcd,
-`node2` worker; `~/m2/inventory` complete.
+**End state 3a**: `spray` at `KUBE_FROM`, `node1` control plane + etcd +
+worker, `node2` worker; `~/m2/inventory` complete.
 
 ### 3b — day 2 (end of session 4)
 
 5. **step5-scale** — move `node3` from `spare` to `kube_node`, commit.
    `ansible-playbook -i inventory ~/kubespray/playbooks/facts.yml` then
-   `~/kubespray/scale.yml --limit=node3` **(to validate: the facts-first
-   procedure of the pinned release's `docs/operations/nodes.md`)**.
+   `~/kubespray/scale.yml --limit=node3` (the facts-first procedure of
+   v2.32.0's `docs/operations/nodes.md`, validated).
    Questions: why `--limit`? why must facts be gathered on all nodes first?
    Check: 3 nodes `Ready`, `node3` has a flannel pod.
 6. **step6-remove** — a Deployment with 3 replicas and a PDB
@@ -449,11 +464,12 @@ with `predownload` done, and the slides quote that number.
    1 lab 3: in which order did nodes go? who drained? what controls how
    many at a time (`serial`), how long a drain may take (`drain_timeout`),
    what happens to a PDB that blocks (`drain_grace_period`, failure)? Count
-   the failed requests. Tag `lab3c`.
+   the failed requests.
 9. **step9-chain** — `ansible-playbook k8s/flux.yml -e
    k8s_kubeconfig=~/m2/inventory/artifacts/admin.conf -e
    k8s_context=<Kubespray's context name>`: the same `fleet/` now runs on
-   `spray`. Write down the chain as commands, from empty nodes:
+   `spray` (context `kubernetes-admin-spray.local@spray.local`). Tag
+   `lab3c`. Write down the chain as commands, from empty nodes:
    `lab0 up` → `site.yml` → `cluster.yml` → `flux.yml` — that list is the
    slide *IaC end to end*, filled by the room.
 
@@ -462,31 +478,33 @@ Delete it at the end of the module (`make -C lab0 down`).
 
 ## Size (trainer)
 
-Nothing measured yet; estimates to replace on the dry run **(to validate)**:
+Measured on the dry run (laptop, `docker stats`) where marked; the rest are
+estimates **(to validate)** on the server:
 
 | What | Per pair | 4 pairs |
 | --- | --- | --- |
-| lab 1: 3 nodes, no Kubernetes | ~150 MiB | ~0.6 GiB |
-| lab 2: kind `iac`, 2 nodes, nginx, podinfo, Flux | ~1.5 GiB | ~6 GiB |
-| lab 3: `spray`, 2–3 nodes, flannel, CoreDNS | ~2 GiB | ~8 GiB |
-| console: `ansible-playbook` of Kubespray | ~300 MiB, in the console's 2 GiB limit | |
+| lab 1: 3 nodes, no Kubernetes | ~30 MiB (10 MiB per idle node, measured) | ~0.1 GiB |
+| lab 2: kind `iac`, 2 nodes, nginx, podinfo, Flux | ~1.5 GiB (estimate) | ~6 GiB |
+| lab 3: `spray`, 2 nodes, flannel, CoreDNS, Flux, podinfo | ~1.7 GiB (measured: `node1` 936 MiB, `node2` 757 MiB) | ~7 GiB |
+| console: `ansible-playbook` of Kubespray | ~300 MiB (estimate), in the console's 2 GiB limit | |
 
 `iac` must be deleted before lab 3 starts, and lab 1's nodes stay up through
 lab 2 (small). CPU is the other limit: `cluster.yml` with 4 pairs starting
 together loads the server's 4 CPUs; stagger the starts by a few minutes if
-the dry run shows timeouts. Disk: Kubespray's binaries and images, ~1.5 GiB
-per node **(to validate)**, on the console's 30 GiB Docker PVC.
+the dry run shows timeouts. Disk: ~1.2 GB per cluster node (measured: 759 MB
+in `/var/lib/containerd`, 464 MB in `/var/tmp/releases`), twice that during
+the upgrade, on the console's 30 GiB Docker PVC.
 
 ## Files to write
 
 ```
 module2/
   README.md            this file
-  versions.env         pinned versions (TODO values to fill)
-  Makefile             catch-up-lab1 (written), catch-up-lab3a
-  lab0/                Makefile, node/{Dockerfile,entrypoint}
+  versions.env         pinned versions (filled)
+  Makefile             catch-up-lab1, catch-up-lab3a (written)
+  lab0/                Makefile, node/{Dockerfile,entrypoint} (written)
   lab1/                README.md, step1…5/, solution/ (written)
   lab2/                README.md, kind.yaml, fleet/, step1…6/, solution/ (written)
   lab3/                README.md, group_vars/k8s_cluster/zz-containers.yml,
-                       load, step1…9/, solution-3a/, solution/
+                       load, step1…9/, solution-3a/, solution/ (written)
 ```

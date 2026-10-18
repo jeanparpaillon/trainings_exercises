@@ -1,0 +1,4 @@
+# The vault password lives in ~/.vault_pass; this is in case someone copies it here.
+.vault_pass
+# Kubespray's admin.conf (lab 3): a cluster-admin credential.
+inventory/artifacts/

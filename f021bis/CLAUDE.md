@@ -33,9 +33,11 @@ module1/                   cluster administration (HA, upgrades, backup, trouble
                            break_it, check_it, fix_it
 module2/README.md          Ansible for Kubernetes: spec of labs 1-3 (kubernetes.core,
                            Flux handover, Kubespray on container nodes), lab0;
-                           versions.env: Kubespray/Kubernetes still TODO. lab1/ (+ `make
-                           catch-up-lab1`) and lab2/ written, run locally only
-                           (container nodes, kind); lab0/ and lab3/ unwritten
+                           all written (lab0 node image + Makefile, labs 1-3,
+                           catch-up-lab1/3a) and run end to end on a laptop,
+                           not yet on the server: Kubespray v2.32.0 on container
+                           nodes works with lab3/group_vars/k8s_cluster/
+                           zz-containers.yml. Each lab README ends with findings
 module3/                   Zabbix (not written yet)
 module4/README.md          Ansible certification: spec of labs 1-5, lab0, exam
                            (step files not written, nothing run yet)

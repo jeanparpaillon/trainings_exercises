@@ -1,0 +1,35 @@
+# Step 4: podinfo, as a Helm release driven by Ansible.
+- name: Podinfo, with Helm
+  hosts: k8s_api
+  gather_facts: false
+  vars_files:
+    - vars/podinfo.yml
+  module_defaults:
+    group/kubernetes.core.helm:
+      kubeconfig: "{{ k8s_kubeconfig }}"
+      context: "{{ k8s_context }}"
+  tasks:
+    - name: Chart repository
+      kubernetes.core.helm_repository:
+        name: podinfo
+        repo_url: https://stefanprodan.github.io/podinfo
+
+    - name: Release podinfo
+      kubernetes.core.helm:
+        name: podinfo
+        chart_ref: podinfo/podinfo
+        chart_version: "{{ podinfo_chart_version }}"
+        release_namespace: podinfo
+        create_namespace: true
+        values: "{{ podinfo_values }}"
+        wait: true
+
+    - name: Read the release back
+      kubernetes.core.helm_info:
+        name: podinfo
+        release_namespace: podinfo
+      register: release
+
+    - name: Revision and status
+      ansible.builtin.debug:
+        msg: "revision {{ release.status.revision }}, {{ release.status.status }}, chart {{ release.status.chart }}"

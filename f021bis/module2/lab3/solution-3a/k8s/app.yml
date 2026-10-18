@@ -1,0 +1,87 @@
+# The web application, one environment at a time:
+#   ansible-playbook k8s/app.yml                  # dev
+#   ansible-playbook k8s/app.yml -e app_env=prod
+- name: Web application
+  hosts: k8s_api
+  gather_facts: false
+  vars_files:
+    - "vars/{{ app_env | default('dev') }}.yml"
+    - vars/vault.yml
+  vars:
+    web_password: "{{ vault_web_password }}"
+  module_defaults:
+    group/kubernetes.core.k8s:
+      kubeconfig: "{{ k8s_kubeconfig }}"
+      context: "{{ k8s_context }}"
+  tasks:
+    - name: Namespace web
+      kubernetes.core.k8s:
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: web
+
+    - name: ConfigMap, the page
+      kubernetes.core.k8s:
+        template: configmap.yaml.j2
+
+    # Step 3: renamed web-page -> web-content. Nothing deletes the old one but
+    # this task; remove it once every cluster has run it.
+    - name: Old ConfigMap web-page
+      kubernetes.core.k8s:
+        state: absent
+        kind: ConfigMap
+        namespace: web
+        name: web-page
+
+    - name: Secret web-credentials
+      kubernetes.core.k8s:
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: web-credentials
+            namespace: web
+          stringData:
+            password: "{{ web_password }}"
+      no_log: true
+
+    - name: Deployment, Service, PodDisruptionBudget
+      kubernetes.core.k8s:
+        template: "{{ item }}"
+        wait: true
+      loop:
+        - deployment.yaml.j2
+        - service.yaml.j2
+        - pdb.yaml.j2
+
+    # Step 3: read back what the cluster says, not what the recap says.
+    - name: Wait for web to be Available
+      kubernetes.core.k8s_info:
+        kind: Deployment
+        namespace: web
+        name: web
+        wait: true
+        wait_condition:
+          type: Available
+          status: "True"
+        wait_timeout: 120
+      register: web
+
+    # In check mode nothing was applied: the cluster still has the old count.
+    - name: All replicas ready
+      when: not ansible_check_mode
+      ansible.builtin.assert:
+        that: web.resources[0].status.readyReplicas == app_replicas
+        fail_msg: "{{ web.resources[0].status.readyReplicas | default(0) }}/{{ app_replicas }} ready"
+        quiet: true
+
+    # A lookup runs on the controller too, but module_defaults do not apply
+    # to it: the connection has to be given again.
+    - name: The same, through a lookup
+      ansible.builtin.debug:
+        msg: "{{ web_lookup.status.readyReplicas }} replicas ready"
+      vars:
+        web_lookup: "{{ lookup('kubernetes.core.k8s', kind='Deployment', namespace='web', resource_name='web',
+                        kubeconfig=k8s_kubeconfig, context=k8s_context) }}"

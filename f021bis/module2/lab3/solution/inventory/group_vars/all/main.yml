@@ -1,0 +1,3 @@
+# The clear name of every secret, mapped to its encrypted value in vault.yml:
+# `grep -r ops_password` still finds where it comes from.
+ops_password: "{{ vault_ops_password }}"

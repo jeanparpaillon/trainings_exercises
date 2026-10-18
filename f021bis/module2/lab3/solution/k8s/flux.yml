@@ -1,0 +1,54 @@
+# Step 6: install Flux and hand it lab2/fleet. Lab 3 runs it again on `spray`:
+#   ansible-playbook k8s/flux.yml -e k8s_kubeconfig=… -e k8s_context=…
+- name: Flux
+  hosts: k8s_api
+  gather_facts: false
+  vars_files:
+    - vars/flux.yml
+  module_defaults:
+    group/kubernetes.core.k8s:
+      kubeconfig: "{{ k8s_kubeconfig }}"
+      context: "{{ k8s_context }}"
+  tasks:
+    - name: Flux's install.yaml, pinned and checked
+      ansible.builtin.get_url:
+        url: https://github.com/fluxcd/flux2/releases/download/{{ flux_version }}/install.yaml
+        dest: /tmp/flux-{{ flux_version }}-install.yaml
+        checksum: sha256:{{ flux_install_sha256 }}
+        mode: "0644"
+
+    - name: Install Flux
+      kubernetes.core.k8s:
+        src: /tmp/flux-{{ flux_version }}-install.yaml
+
+    - name: Wait for the controllers
+      kubernetes.core.k8s_info:
+        kind: Deployment
+        namespace: flux-system
+        label_selectors:
+          - app.kubernetes.io/part-of=flux
+        wait: true
+        wait_condition:
+          type: Available
+          status: "True"
+        # 7 images, ~330 MB from ghcr.io, pulled one at a time by each kubelet.
+        wait_timeout: 600
+
+    - name: GitRepository and Kustomization
+      kubernetes.core.k8s:
+        template: "{{ item }}"
+      loop:
+        - gitrepository.yaml.j2
+        - kustomization.yaml.j2
+
+    - name: Wait for the first reconciliation
+      kubernetes.core.k8s_info:
+        api_version: kustomize.toolkit.fluxcd.io/v1
+        kind: Kustomization
+        namespace: flux-system
+        name: fleet
+        wait: true
+        wait_condition:
+          type: Ready
+          status: "True"
+        wait_timeout: 300

@@ -1,0 +1,10 @@
+galaxy_info:
+  author: f021bis
+  description: Prepare a node for Kubernetes, without installing it
+  license: Apache-2.0
+  min_ansible_version: "2.17"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - noble
+dependencies: []

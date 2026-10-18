@@ -1,0 +1,3 @@
+app_env: prod
+app_replicas: 3
+app_message: Hello from prod

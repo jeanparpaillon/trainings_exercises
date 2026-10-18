@@ -1,0 +1,9 @@
+# Step 6. FLUX_VERSION of versions.env, and the sha256 of its install.yaml:
+#   curl -sL https://github.com/fluxcd/flux2/releases/download/<version>/install.yaml | sha256sum
+flux_version: v2.9.6
+flux_install_sha256: 9c1fda7e401429531ed1478f67ba06b3edff6513b75da7ee47bde9f1c4d4251c
+
+# What Flux reconciles: the trainer's repo, lab2/fleet.
+flux_git_url: https://github.com/jeanparpaillon/trainings_exercises
+flux_git_branch: master
+flux_git_path: ./f021bis/module2/lab2/fleet
