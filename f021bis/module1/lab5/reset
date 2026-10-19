@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# lab5/reset — undo every scenario, then re-apply the end state of lab 4.
+# lab5/reset — undo every scenario, then re-apply step 1 (Bookinfo on MySQL).
 source "$(dirname "$0")/lib.sh"
 for f in "$here"/scenarios/*.sh; do
   ( source "$f"; fix_it ) || echo "reset of $(basename "$f" .sh) failed, carrying on" >&2
 done
-$K apply -k "$here/../lab3/step2-ready" >/dev/null
+$K apply -k "$here/step1-stateful" >/dev/null
+$K -n $NS delete deploy ratings-v1 --ignore-not-found >/dev/null
+$K -n $NS delete pdb ratings-v1 --ignore-not-found >/dev/null
 $K -n $NS rollout status deploy --timeout=300s >/dev/null
-if page_ok 10; then echo "prod is back to the end of lab 4."; else die "prod is still not healthy: ask the trainer"; fi
+if page_ok 10; then echo "prod is back to lab 5 step 1."; else die "prod is still not healthy: ask the trainer"; fi

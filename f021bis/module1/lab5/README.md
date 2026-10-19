@@ -1,14 +1,15 @@
 # Lab 5 — troubleshooting
 
-**Slides:** *Troubleshooting*, then *Lab 5* · **~60 min**
+**Slides:** *Troubleshooting*, then *Lab 5* · **~70 min**
 
 Faults you did not inject, found with a method — **symptom, scope, layer** —
 and the tool of each layer. `prod` at the end of lab 4 is the patient
-(`make catch-up-lab4` in `module1/` if yours is gone).
+(`make catch-up-lab4` in `module1/` if yours is gone), with some state
+added first: [step1-stateful](step1-stateful/) puts the ratings on MySQL.
 
 ```sh
 cd ~/trainings_exercises/f021bis/module1
-lab5/reset            # start from a healthy prod
+lab5/reset            # start from a healthy prod (applies step 1 too)
 lab5/break 1          # inject scenario 1; you are told only the symptom
 lab5/check 1          # fixed yet?
 ```

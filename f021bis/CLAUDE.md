@@ -28,7 +28,7 @@ module1/                   cluster administration (HA, upgrades, backup, trouble
   lab2/{kind.yaml,values/} prod's kind config, Helm values of Linkerd
   lab3/{k6.js,load}        load generator, run OUTSIDE the cluster
   lab4/s3/                 SeaweedFS S3 store for Velero (start script, identity, creds)
-  lab5/{break,check,reset,lib.sh,scenarios/N.sh}
+  lab5/{break,check,reset,lib.sh,scenarios/N.sh,step1-stateful/}
                            fault injection; each scenario defines symptom,
                            break_it, check_it, fix_it
 module2/README.md          Ansible for Kubernetes: spec of labs 1-3 (kubernetes.core,
@@ -44,8 +44,8 @@ module4/README.md          Ansible certification: spec of labs 1-5, lab0, exam
 ```
 
 Bookinfo states are cumulative overlays: `bookinfo/` → `lab2/step3-install`
-(meshed) → `lab3/step2-ready` (drain-safe, reviews-v2 only), which is
-also the state of labs 4 and 5. An overlay that adds resources
+(meshed) → `lab3/step2-ready` (drain-safe, reviews-v2 only; also lab 4's
+state) → `lab5/step1-stateful` (ratings-v2 on MySQL, for scenarios 2 and 7). An overlay that adds resources
 must set `namespace: bookinfo` itself — the base's `namespace:` does not
 reach them (this once put lab 3's PDBs in `default`).
 

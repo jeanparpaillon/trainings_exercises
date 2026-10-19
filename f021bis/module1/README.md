@@ -116,7 +116,7 @@ included by the Makefiles.
 ## Size (trainer)
 
 Measured on a dry run (one pair, one laptop): `prod` with Linkerd HA, viz,
-Bookinfo drain-safe and Velero uses **~3 GiB**; `ha` (three control
+Bookinfo drain-safe, Velero and lab 5's MySQL uses **~3 GiB**; `ha` (three control
 planes, nothing else) somewhat less. With 8 trainees in **4 pairs**:
 
 - lab 1: 4 × `ha` — start the clusters pair by pair, delete them at the end
@@ -146,5 +146,7 @@ Kept here because each one is a production lesson the step files build on:
   node, wait for `/readyz` before draining the next node.
 - **An etcd restore needs `--bump-revision --mark-compacted`**, or every
   watcher (kube-proxy first) misses the restored objects.
+- **Bookinfo's MySQL image is MySQL 9**, which ratings-v2 cannot log into:
+  lab 5 uses `mysql:8.4`.
 - **Linkerd balances on latency**: a slow or broken replica behind the same
   Service as healthy ones gets almost no traffic — and hides from lab 5.
