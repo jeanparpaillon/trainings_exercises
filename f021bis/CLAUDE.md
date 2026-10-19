@@ -38,7 +38,9 @@ module2/README.md          Ansible for Kubernetes: spec of labs 1-3 (kubernetes.
                            not yet on the server: Kubespray v2.32.0 on container
                            nodes works with lab3/group_vars/k8s_cluster/
                            zz-containers.yml. Each lab README ends with findings
-module3/                   Zabbix (not written yet)
+module3/README.md          Zabbix: spec of labs 1-4 (proxy per pair on the room's
+                           Zabbix 7.0, discovery, Prometheus metrics, alerts +
+                           drill), lab0, bin/zabbix pairs; nothing written or run
 module4/README.md          Ansible certification: spec of labs 1-5, lab0, exam
                            (step files not written, nothing run yet)
 ```
