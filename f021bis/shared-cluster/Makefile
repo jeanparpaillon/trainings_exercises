@@ -28,9 +28,13 @@ all:
 # Nested kind clusters (one or more per trainee, inside the dind sidecars)
 # all share the server's kernel: the defaults run out of inotify instances
 # after a few clusters ("too many open files" from kubelet / kube-proxy).
+# Named to sort last in /etc/sysctl.d: the server also has a 99-kind.conf
+# (512 instances), which overrode a 99-f021bis-kind.conf at every boot.
 sysctl:
-	ssh $(S) "printf '%s\n' fs.inotify.max_user_instances=8192 fs.inotify.max_user_watches=1048576 \
-	  > /etc/sysctl.d/99-f021bis-kind.conf && sysctl -q --system"
+	ssh $(S) "rm -f /etc/sysctl.d/99-f021bis-kind.conf \
+	  && printf '%s\n' fs.inotify.max_user_instances=8192 fs.inotify.max_user_watches=1048576 \
+	  > /etc/sysctl.d/99-zz-f021bis-kind.conf && sysctl -q --system \
+	  && sysctl fs.inotify.max_user_instances fs.inotify.max_user_watches"
 
 create:
 	ssh $(S) mkdir -p $(REMOTE)

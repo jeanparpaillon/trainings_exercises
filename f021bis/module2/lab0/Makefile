@@ -29,7 +29,7 @@ NODES         ?= node1 node2 node3
 NODE_PREFIX   := $(shell echo $(NODE_SUBNET) | cut -d. -f1-3)
 
 # Trainer side: the f021bis dev cluster's kubeconfig (shared-cluster/Makefile).
-CONSOLES_KUBECONFIG ?= ../../../shared-cluster/kubeconfig
+CONSOLES_KUBECONFIG ?= ../../shared-cluster/kubeconfig
 CONSOLES_KUBECTL := kubectl --kubeconfig=$(CONSOLES_KUBECONFIG) --context=training-f021bis -n consoles
 
 kubespray:
@@ -68,7 +68,10 @@ up: $(SSH_KEY)
 	    $(NODE_IMAGE) >/dev/null && echo "$$n $(NODE_PREFIX).1$$i"; \
 	done
 	for n in $(NODES); do \
-	  until docker exec $$n systemctl is-active -q ssh 2>/dev/null; do sleep 1; done; \
+	  until docker exec $$n systemctl is-active -q ssh 2>/dev/null; do \
+	    [ "$$(docker inspect -f '{{.State.Running}}' $$n)" = true ] \
+	      || { echo "$$n exited:"; docker logs --tail 20 $$n; exit 1; }; \
+	    sleep 1; done; \
 	  docker exec -i $$n sh -c 'cat > /home/ansible/.ssh/authorized_keys \
 	    && chown ansible: /home/ansible/.ssh/authorized_keys \
 	    && chmod 0600 /home/ansible/.ssh/authorized_keys' < $(SSH_KEY).pub; \
