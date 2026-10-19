@@ -1,0 +1,12 @@
+#!/bin/sh
+
+USER=${USER:-$(whoami)}
+
+[ $# -gt 0 ] || set -- -l
+
+exec kubectl \
+    -n consoles \
+    exec \
+    -it deployments/console-$USER \
+    -c console -- \
+    bash -l "$@"
