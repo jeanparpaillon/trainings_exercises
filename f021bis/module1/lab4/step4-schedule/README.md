@@ -1,4 +1,4 @@
-# Step 5 — schedules, and the restore test
+# Step 4 — schedules, and the restore test
 
 **Slide:** What is there to back up? · **~5 min**
 
@@ -14,15 +14,14 @@ velero backup get
 the history you keep.
 
 A backup is proven by a restore. Restore into **another namespace**, so
-production is not touched, and check the data there:
+production is not touched, and check what came back there:
 
 ```sh
 b=$(velero backup get -o json | jq -r '.items | sort_by(.metadata.creationTimestamp) | last | .metadata.name')
 velero restore create restore-test --from-backup "$b" \
   --namespace-mappings bookinfo:bookinfo-restore-test --wait
-kubectl -n bookinfo-restore-test rollout status deploy/mysqldb-v1 --timeout=5m
-kubectl -n bookinfo-restore-test exec deploy/mysqldb-v1 -c mysqldb -- sh -c \
-  'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" test -e "SELECT * FROM ratings"'
+velero restore describe restore-test
+kubectl -n bookinfo-restore-test get deploy,svc,configmap
 kubectl delete ns bookinfo-restore-test
 ```
 

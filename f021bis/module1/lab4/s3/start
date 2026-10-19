@@ -10,7 +10,7 @@
 # SeaweedFS (`weed server -s3`): master, volume, filer and S3 gateway in one
 # process. One identity, lab4/s3/s3.json, whose keys are the ones Velero is
 # given (lab4/s3/credentials-velero). Without identities SeaweedFS refuses
-# signed requests, and Velero's volume backups (kopia) sign theirs.
+# signed requests, and Velero signs its own.
 #
 # The config is copied in with `docker cp`, not bind-mounted: the Docker
 # daemon is the console's dind sidecar, which does not see the console's

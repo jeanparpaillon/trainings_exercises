@@ -1,4 +1,4 @@
-# Step 3 — restore etcd
+# Step 2 — restore etcd
 
 **Slide:** etcd: snapshot and restore · **~20 min**
 
@@ -6,12 +6,11 @@
 
 ```sh
 kubectl delete ns bookinfo
-kubectl get pv
 stars                                            # 0
 ```
 
-**Hypothesis first:** after restoring the snapshot of step 2, is
-`bookinfo` back? The MySQL row? The `after-snapshot` ConfigMap?
+**Hypothesis first:** after restoring the snapshot of step 1, is
+`bookinfo` back? The `after-snapshot` ConfigMap?
 
 ## Restore
 
@@ -78,41 +77,17 @@ for n in prod-control-plane prod-worker; do docker exec $n systemctl restart kub
 docker exec prod-control-plane sh -c \
   'for c in kube-controller-manager kube-scheduler; do crictl stop $(crictl ps -q --name "^$c$"); done'
 kubectl -n bookinfo rollout status deploy --timeout=5m
-stars
-kubectl -n bookinfo exec deploy/mysqldb-v1 -c mysqldb -- sh -c \
-  'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" test -e "SELECT * FROM ratings"'
-```
-
-Everything comes back but MySQL, stuck in `PodInitializing`:
-
-```sh
-kubectl -n bookinfo describe pod -l app=mysqldb | tail -3      # FailedMount: path … does not exist
-```
-
-etcd held the PVC and PV *objects*: a pointer to a directory on a node. The
-directory, with the data, was deleted with the namespace (`reclaimPolicy:
-Delete`). A `local` PV refuses to mount a path that is gone. (A `hostPath`
-PV — local-path's default — would have silently created an empty one and
-MySQL would have started on it: worse, because nothing would have said so.)
-
-The data is lost. Get the application back on an empty volume:
-
-```sh
-pv=$(kubectl -n bookinfo get pvc mysqldb -o jsonpath='{.spec.volumeName}')
-kubectl -n bookinfo scale deploy mysqldb-v1 --replicas=0
-kubectl -n bookinfo delete pvc mysqldb
-kubectl delete pv "$pv"
-kubectl apply -k lab4/step1-stateful
-kubectl -n bookinfo rollout status deploy/mysqldb-v1 --timeout=5m
-kubectl -n bookinfo exec deploy/mysqldb-v1 -c mysqldb -- sh -c \
-  'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" test -e "SELECT * FROM ratings"'
-stars                                            # 9: the init script's 5 and 4
+stars                                            # 9
 ```
 
 Fill the etcd row of the table in [`../README.md`](../README.md): namespace
-back, ConfigMap made after the snapshot gone, your MySQL change gone.
+back, ConfigMap made after the snapshot gone — the whole cluster went back
+in time, not only what you deleted.
 
 ## Questions
+
+- etcd holds objects only. Had `bookinfo` carried a PersistentVolume, what
+  would the restored PV have pointed at?
 
 - What else went back in time that you did not look at? (Leases, node
   heartbeats, EndpointSlices, Helm release Secrets, ReplicaSet revisions.)

@@ -16,7 +16,7 @@ module1/                   cluster administration (HA, upgrades, backup, trouble
   versions.env             every pinned version; KEY=value, sourced by bash AND
                            included by make — no quotes, no spaces
   Makefile                 catch-up-lab2/3/4 (rebuild `prod` at the end of a lab),
-                           `green` (lab 4 step 6); CLUSTER= / KIND_CONFIG= / CHARTS=
+                           `green` (lab 4 step 5); CLUSTER= / KIND_CONFIG= / CHARTS=
   .gitignore               lab2/certs/, lab4/backup/
   bookinfo/                F021's Bookinfo (by relative path) in namespace bookinfo,
                            productpage NodePort 30080 — base of every Bookinfo overlay
@@ -44,8 +44,8 @@ module4/README.md          Ansible certification: spec of labs 1-5, lab0, exam
 ```
 
 Bookinfo states are cumulative overlays: `bookinfo/` → `lab2/step3-install`
-(meshed) → `lab3/step2-ready` (drain-safe, reviews-v2 only) →
-`lab4/step1-stateful` (ratings-v2 on MySQL). An overlay that adds resources
+(meshed) → `lab3/step2-ready` (drain-safe, reviews-v2 only), which is
+also the state of labs 4 and 5. An overlay that adds resources
 must set `namespace: bookinfo` itself — the base's `namespace:` does not
 reach them (this once put lab 3's PDBs in `default`).
 
@@ -68,7 +68,7 @@ changes:
   Each lab's end state is the next one's start, and has a `make
   catch-up-labN` target; keep those in sync when a lab's end state changes.
 - **Everything here was run** on kind v0.33.0 with the pinned versions (dry
-  run 2026-10-17), except lab 4 step 6 (`green`). When changing a step, run
+  run 2026-10-17), except lab 4 step 5 (`green`). When changing a step, run
   it again rather than reasoning about it: most of the traps listed in
   `module1/README.md` ("What was learned") were found that way, not
   predicted.

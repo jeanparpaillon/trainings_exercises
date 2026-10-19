@@ -7,7 +7,6 @@
 #   bookinfo/                     lab 2 step 1   as F021 ships it
 #   lab2/step3-install/           lab 2 step 3   + meshed
 #   lab3/step2-ready/             lab 3 step 2   + drain-safe
-#   lab4/step1-stateful/          lab 4 step 1   + ratings on MySQL
 #
 # The namespace is set here, unlike in F021: the cluster is yours, there is
 # no per-attendee namespace to keep free.

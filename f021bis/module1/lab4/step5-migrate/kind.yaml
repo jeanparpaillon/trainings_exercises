@@ -1,4 +1,4 @@
-# Lab 4 step 6 — `green`: the cluster Bookinfo migrates to. Same shape as
+# Lab 4 step 5 — `green`: the cluster Bookinfo migrates to. Same shape as
 # prod (lab2/kind.yaml); productpage is published on 127.0.0.1:30081, since
 # prod already holds 30080 of the console.
 #

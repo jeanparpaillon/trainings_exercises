@@ -1,4 +1,4 @@
-# Step 2 — etcd snapshot, and what goes with it
+# Step 1 — etcd snapshot, and what goes with it
 
 **Slide:** etcd: snapshot and restore · **~10 min**
 

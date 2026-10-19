@@ -6,7 +6,7 @@
 #   make catch-up-lab2   prod at K8S_FROM, Linkerd LINKERD_TO + viz, Bookinfo meshed
 #   make catch-up-lab3   prod at K8S_TO (created at that version, not upgraded),
 #                        Linkerd HA, Bookinfo drain-safe
-#   make catch-up-lab4   + ratings on MySQL, the S3 store, Velero
+#   make catch-up-lab4   + the S3 store, Velero
 #
 # The pieces are targets too (certs, linkerd, …): the step files show the
 # commands they run, this is only for getting back on track.
@@ -16,7 +16,7 @@
 
 include versions.env
 
-# Another cluster than prod (lab 4 step 6): CLUSTER=green KIND_CONFIG=…
+# Another cluster than prod (lab 4 step 5): CLUSTER=green KIND_CONFIG=…
 CLUSTER     ?= prod
 KIND_CONFIG ?= lab2/kind.yaml
 KUBECTL  = kubectl --context kind-$(CLUSTER)
@@ -38,12 +38,12 @@ catch-up-lab3: CP_VALUES += -f lab3/step2-ready/linkerd-ha.yaml
 catch-up-lab3: prod-cluster gateway-api certs linkerd bookinfo-ready
 catch-up-lab4: NODE_IMAGE = $(KIND_NODE_TO)
 catch-up-lab4: CP_VALUES += -f lab3/step2-ready/linkerd-ha.yaml
-catch-up-lab4: prod-cluster gateway-api certs linkerd bookinfo-stateful velero
+catch-up-lab4: prod-cluster gateway-api certs linkerd bookinfo-ready velero
 
-# Lab 4 step 6: `green`, at K8S_TO, with Linkerd (same certificates) and
+# Lab 4 step 5: `green`, at K8S_TO, with Linkerd (same certificates) and
 # Velero on the same bucket — no Bookinfo: it comes from the backup.
 green: CLUSTER = green
-green: KIND_CONFIG = lab4/step6-migrate/kind.yaml
+green: KIND_CONFIG = lab4/step5-migrate/kind.yaml
 green: NODE_IMAGE = $(KIND_NODE_TO)
 green: prod-cluster gateway-api certs linkerd velero
 
@@ -88,19 +88,13 @@ bookinfo-ready:
 	$(KUBECTL) -n bookinfo delete deploy reviews-v1 reviews-v3 --ignore-not-found
 	$(KUBECTL) -n bookinfo rollout status deploy --timeout=10m
 
-bookinfo-stateful:
-	$(KUBECTL) apply -k lab4/step1-stateful
-	$(KUBECTL) -n bookinfo delete deploy reviews-v1 reviews-v3 ratings-v1 --ignore-not-found
-	$(KUBECTL) -n bookinfo delete pdb ratings-v1 --ignore-not-found
-	$(KUBECTL) -n bookinfo rollout status deploy --timeout=10m
-
 velero:
 	url=$$(lab4/s3/start) && velero install --kubecontext kind-$(CLUSTER) \
 	  --provider aws --plugins velero/velero-plugin-for-aws:$(VELERO_AWS_PLUGIN_VERSION) \
 	  --image velero/velero:$(VELERO_VERSION) \
 	  --bucket velero --secret-file lab4/s3/credentials-velero \
 	  --backup-location-config region=us-east-1,s3ForcePathStyle=true,s3Url=$$url \
-	  --use-node-agent --use-volume-snapshots=false --wait
+	  --use-volume-snapshots=false --wait
 
 .PHONY: catch-up-lab2 catch-up-lab3 catch-up-lab4 green prod-cluster gateway-api certs \
-  linkerd bookinfo-meshed bookinfo-ready bookinfo-stateful velero
+  linkerd bookinfo-meshed bookinfo-ready velero

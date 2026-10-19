@@ -1,4 +1,4 @@
-# Step 6 — migrate Bookinfo to a new cluster *(optional)*
+# Step 5 — migrate Bookinfo to a new cluster *(optional)*
 
 **Slide:** In place, or migrate? · **~10 min**
 
@@ -26,7 +26,7 @@ their identity.
 ```sh
 velero --kubecontext kind-green restore create migrate --from-backup bookinfo --wait
 kubectl --context kind-green -n bookinfo rollout status deploy --timeout=5m
-curl -s http://127.0.0.1:30081/productpage | grep -c glyphicon-star    # 5: the data came along
+curl -s http://127.0.0.1:30081/productpage | grep -c glyphicon-star    # 9
 ```
 
 ## Switch, then clean up
@@ -42,6 +42,6 @@ kind delete cluster --name green
 
 - What did *not* come over? (Anything outside `bookinfo`: cluster-scoped
   objects, other namespaces, Helm releases of the platform.)
-- MySQL was copied at backup time. What happens to writes made on `prod`
-  between the backup and the switch?
+- Bookinfo has no data of its own. With a database, what would happen to
+  writes made on `prod` between the backup and the switch?
 - Which is cheaper for this application: lab 3's in-place upgrade, or this?
