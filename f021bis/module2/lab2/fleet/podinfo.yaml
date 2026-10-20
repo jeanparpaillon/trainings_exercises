@@ -5,7 +5,7 @@ metadata:
   labels:
     app: podinfo
 spec:
-  replicas: 3
+  replicas: 2
   selector:
     matchLabels:
       app: podinfo
@@ -20,7 +20,7 @@ spec:
           command: ["./podinfo", "--port=9898", "--level=info"]
           env:
             - name: PODINFO_UI_MESSAGE
-              value: "deployed by Flux (round 2)"
+              value: "deployed by Flux"
           ports:
             - name: http
               containerPort: 9898
