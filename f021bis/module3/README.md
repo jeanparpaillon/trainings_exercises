@@ -5,11 +5,12 @@ are in `../../../trainings/f021bis/slides/module3.md`; every lab here names
 the slides it belongs to, and the slides point back with
 `📖 module3/README.md — Lab N`.
 
-> **Status: lab 1 written**, with `lab0/`, `versions.env` and `make
-> catch-up-lab1`, and run end to end on a laptop (2026-10-20) against the
-> room's Zabbix deployed locally — not yet on the server, which was down:
-> what that run did not cover is listed in [`lab1/README.md`](lab1/README.md#what-was-found-on-a-local-run).
-> Labs 2 to 4 are still a **specification**: facts about the Kubernetes
+> **Status: labs 1 and 2 written and validated on the server**
+> (2026-10-20, `console-jean`), with `lab0/`, `versions.env`, `make
+> catch-up-lab1` and `catch-up-lab2`; findings in each lab's README. One
+> open decision: tenants cannot delete their parent hosts once discovery
+> has run ([`lab2/README.md`](lab2/README.md#validated-on-the-server)).
+> Labs 3 and 4 are still a **specification**: facts about the Kubernetes
 > templates shipped with 7.0 are from their documentation or read off a
 > server, not from a run, and are marked **(to validate)** where a step
 > depends on them.

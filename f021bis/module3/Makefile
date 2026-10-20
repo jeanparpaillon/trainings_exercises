@@ -39,6 +39,7 @@ mon:
 	@test -r $(ZBX_ENV) || { echo "no $(ZBX_ENV): make -C lab0 credentials"; exit 1; }
 	$(ENV); kind get clusters 2>/dev/null | grep -qx "$$CLUSTER" \
 	  || kind create cluster --name "$$CLUSTER" --config lab1/kind.yaml --image $(KIND_NODE)
+	$(ENV); kubectl config set-context "kind-$$CLUSTER" --namespace default >/dev/null
 	$(MAKE) -C lab0 chart
 	$(ENV); $(MAKE) -C lab0 load CLUSTER="$$CLUSTER"
 

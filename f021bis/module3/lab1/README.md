@@ -42,6 +42,25 @@ works: creates `mon` if missing, installs or upgrades the chart with the
 solution's values, replaces your hosts on the server by the solution's, and
 `~/m3` by the solution (the old one is moved aside).
 
+## Validated on the server
+
+2026-10-20, in `console-jean`, against the room's Zabbix (`make zabbix`,
+`make zabbix-users`): every step as written, through the real path (proxy
+→ `195.35.2.222:10051` → socat → server) and with `ZBX_API` on the
+frontend's Service (the public host name does resolve to `127.0.1.1` in a
+console). Measured there: `kind create` 48 s, `lab0 load` 26 s; proxy
+online as soon as the pod started; scaled to 0, *offline* by 62 s, back
+16 s after; link cut, *offline* after 70 s, back 7 s after, no gap in the
+history; Linux template items discovered 27 s after the hosts were made.
+New there: both node hosts raise *Linux: Load average is too high (per CPU
+load over 1.5 for 5m)* — the server's load, seen through a kind node;
+kube-state-metrics runs.
+
+**Found there**: kind's context in a console has no namespace, and
+`kubectl` in a pod then falls back to the pod's own namespace, `consoles`
+(`kubectl scale deploy/churn` → `namespaces "consoles" not found`). Step 1
+and `make mon` set the context's namespace to `default`.
+
 ## What was found on a local run
 
 Run end to end on a laptop (2026-10-20), not yet on the server, which was

@@ -42,6 +42,28 @@ missing, `~/m3` = the solution, the chart, the control plane rebound,
 your hosts replaced by the two parent hosts, the token set in their
 macros; discovery recreates the rest within a few minutes.
 
+## Validated on the server
+
+2026-10-20, in `console-jean`, steps 1 to 6 as written, then `make
+catch-up-lab2` on an existing `mon`. Measured there: nodes discovered 71 s
+after the parent host was created, cluster state 24 s (442 items, 304
+after the filter; nodes host 178 → 138 after the coredns restart);
+`churn` on both hosts 45–60 s after `kubectl apply`, its pod items gone
+from the nodes host 61 s after scaling to 0, everything disabled 12–22 s
+after `kubectl delete`; controller manager data 34 s after the
+`bind-address` fix (2008 items). No problem raised at any point except the
+server's load average on the node hosts.
+
+**Found there — tenants cannot delete their parent hosts once discovery
+has run**: deleting `<name> mon nodes` deletes its discovered hosts, which
+are in `Applications`, read-only to the tenant: `host.delete: Invalid
+parameter "/groups/1": object does not exist, or you have no permissions
+to it`. Consequences: `make catch-up-lab1` after lab 2 fails (the parents
+stay, and lab 1's hosts collide with the discovered ones); `make
+catch-up-lab2` works only because the import updates the parents in
+place. **Open decision**: write on `Applications` for tenants in
+`bin/zabbix users`, or keep read-only and have the trainer delete parents.
+
 ## What was found on a local run
 
 Run on a laptop (2026-10-20) like lab 1 (same caveats: a local copy of

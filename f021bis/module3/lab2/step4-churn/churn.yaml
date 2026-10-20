@@ -1,7 +1,7 @@
 # Lab 2 step 4: an object that comes and goes, for discovery to follow.
 #
 #   kubectl apply -f lab2/step4-churn/churn.yaml
-#   kubectl scale deploy/churn --replicas=0
+#   kubectl -n default scale deploy/churn --replicas=0
 #   kubectl delete -f lab2/step4-churn/churn.yaml
 #
 # podinfo's image: already in both nodes (make -C lab0 load). In `default`,

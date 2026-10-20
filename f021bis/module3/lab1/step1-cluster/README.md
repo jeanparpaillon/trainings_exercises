@@ -37,9 +37,15 @@ into Git.
 ```sh
 kind create cluster --name "$CLUSTER" --config lab1/kind.yaml --image "$KIND_NODE"
 kubectl config current-context        # kind-mon-<name>
+kubectl config set-context --current --namespace default
 make -C lab0 load                     # the module's images into both nodes
 kubectl get nodes -o wide             # note the two INTERNAL-IPs: step 4
 ```
+
+The `set-context` line matters in a console: kind's context has no
+namespace, and `kubectl` running **in a pod** then falls back to the pod's
+own namespace, `consoles` — `kubectl get pods` in your cluster would look
+in a namespace that does not exist there.
 
 `make -C lab0 load` is `docker save --platform linux/amd64` then `kind
 load image-archive`: plain `kind load docker-image` fails with this Docker
