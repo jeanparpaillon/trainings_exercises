@@ -1,0 +1,32 @@
+# Lab 2 step 4: an object that comes and goes, for discovery to follow.
+#
+#   kubectl apply -f lab2/step4-churn/churn.yaml
+#   kubectl scale deploy/churn --replicas=0
+#   kubectl delete -f lab2/step4-churn/churn.yaml
+#
+# podinfo's image: already in both nodes (make -C lab0 load). In `default`,
+# one of the namespaces step 3's filter keeps.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: churn
+  namespace: default
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: churn
+  template:
+    metadata:
+      labels:
+        app: churn
+    spec:
+      containers:
+        - name: podinfo
+          image: ghcr.io/stefanprodan/podinfo:6.15.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9898
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {memory: 64Mi}

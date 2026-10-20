@@ -20,7 +20,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 for f in "$@"; do
   # host<TAB>template, one line per link.
   links=$(awk '
-    /^    - host: /           { host = $3; gsub(/\x27/, "", host); next }
+    /^    - host: /           { host = substr($0, index($0, "host: ") + 6); gsub(/^\x27|\x27$/, "", host); next }
     /^      templates:$/      { in_t = 1; next }
     in_t && /^        - name: / { t = substr($0, index($0, "name: ") + 6); gsub(/^\x27|\x27$/, "", t); print host "\t" t; next }
     in_t && !/^        /      { in_t = 0 }

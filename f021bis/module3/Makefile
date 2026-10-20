@@ -6,6 +6,10 @@
 #   make catch-up-lab1   mon created if missing, images loaded; ~/m3 = lab1/solution,
 #                        tagged lab1; the chart installed or upgraded from its
 #                        values.yaml; your hosts on the server replaced by its hosts/
+#   make catch-up-lab2   the same with lab2/solution (the parent hosts `<name> mon
+#                        nodes` / `<name> mon state`), the chart's token set in their
+#                        {$KUBE.API.TOKEN}; controller manager and scheduler bound
+#                        to 0.0.0.0. Discovery then recreates the rest in ~1 min
 #
 # The pieces are targets too (mon, chart, …); the step files show the
 # commands they run, this is only for getting back on track.
@@ -26,6 +30,10 @@ ENV = set -euo pipefail; . $(ZBX_ENV); export ZABBIX_VERSION=$(ZABBIX_VERSION); 
 catch-up-lab1: mon
 	$(MAKE) m3 LAB=lab1
 	$(MAKE) chart hosts
+
+catch-up-lab2: mon
+	$(MAKE) m3 LAB=lab2
+	$(MAKE) chart control-plane hosts token
 
 mon:
 	@test -r $(ZBX_ENV) || { echo "no $(ZBX_ENV): make -C lab0 credentials"; exit 1; }
@@ -68,4 +76,21 @@ hosts:
 	  [ "$$ids" = '[]' ] || { lab0/zapi host.delete "$$ids" >/dev/null && echo "hosts deleted: $$ids"; }; \
 	  lab0/import $(M3)/hosts/*.yaml
 
-.PHONY: catch-up-lab1 mon m3 chart hosts
+# Lab 2 step 5: the metrics ports of the controller manager and the scheduler
+# on the node's address; the kubelet restarts both static pods.
+control-plane:
+	$(ENV); for c in kube-controller-manager kube-scheduler; do \
+	  docker exec "$$CLUSTER-control-plane" sed -i 's/--bind-address=127.0.0.1/--bind-address=0.0.0.0/' \
+	    /etc/kubernetes/manifests/$$c.yaml; done
+
+# {$KUBE.API.TOKEN} of your hosts that have one: an export leaves secret
+# macros without their value. The token goes through stdin, never argv.
+token:
+	$(ENV); tok=$$(k -n monitoring get secret zabbix-zabbix-helm-chart -o jsonpath='{.data.token}' | base64 -d); \
+	  gid=$$(lab0/zapi hostgroup.get "$$(jq -nc --arg n "$$ZBX_USER" '{output: ["groupid"], filter: {name: [$$n]}}')" | jq -r '.[0].groupid'); \
+	  lab0/zapi usermacro.get "$$(jq -nc --arg g "$$gid" '{output: ["hostmacroid"], groupids: [$$g], filter: {macro: "{$$KUBE.API.TOKEN}"}}')" \
+	    | jq -r '.[].hostmacroid' | while read -r id; do \
+	      TOK=$$tok jq -nc --arg i "$$id" '{hostmacroid: $$i, value: env.TOK, type: 1}' \
+	        | lab0/zapi usermacro.update - >/dev/null && echo "token set: macro $$id"; done
+
+.PHONY: catch-up-lab1 catch-up-lab2 mon m3 chart hosts control-plane token
