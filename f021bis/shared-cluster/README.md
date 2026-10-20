@@ -45,7 +45,7 @@ they survive a console restart, but kind clusters come back stopped —
 | [`bin/render`](bin/render) | `trainees/` from the trainee names (git-ignored) |
 | [`bin/secrets`](bin/secrets) | runs on the server: console passwords from `/root/users/consoles.txt` |
 | [`zabbix/`](zabbix/) | Zabbix 7.0 LTS for every lab cluster: PostgreSQL, server (+ agent2 sidecar), web, Ingress `/zabbix/` |
-| [`bin/zabbix`](bin/zabbix) | runs on the server: Zabbix passwords, the `zabbix-trapper` port forward, Admin's password |
+| [`bin/zabbix`](bin/zabbix) | runs on the server: Zabbix passwords, the `zabbix-trapper` port forward, Admin's password, module 3's per-trainee tenants |
 
 The passwords never leave the server: `make render` only reads the first
 column of `consoles.txt`, `make secrets` runs on the server.
@@ -106,6 +106,22 @@ version. Proxies in the labs must be the same major version (7.0).
 
 Port 10051 is open to the Internet. The server only accepts data from
 proxies and hosts declared in it; keep autoregistration off, or use PSK.
+
+**Module 3 tenants**: `make zabbix-users` (`NAMES="user1 user2"` for some)
+creates, for each trainee of `/root/users/consoles.txt`, named after their
+console login: a host group and a template group `<name>`, a user group with
+write on both, read on the shipped `Templates*` groups and on everyone's
+hosts, a user `<name>`
+(Admin role) and an active proxy `<name>` that only accepts its PSK
+(identity `<name>`). Password and PSK are generated once, kept in Secret
+`zabbix/zabbix-user-<name>`, and copied to the trainee's namespace as Secret
+`zabbix-user` (`name`, `password`, `psk_identity`, `psk`, `server`, `url`).
+Re-runnable; it never rotates a password or a PSK. `make
+zabbix-users-delete` removes the trainee's maintenances, actions, dashboards,
+maps, hosts and templates, then the above. Tested on a local kind cluster
+with these manifests (2026-10-19), not yet on the server. Every trainee
+reads every trainee's hosts (their host groups, and `Applications`, where
+discovered Kubernetes hosts land), and changes only their own.
 
 ## Size and security
 

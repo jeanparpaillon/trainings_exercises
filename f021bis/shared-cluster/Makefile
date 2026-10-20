@@ -105,6 +105,15 @@ zabbix:
 	ssh $(S) 'bash -s' -- forward < bin/zabbix
 	ssh $(S) 'bash -s' -- admin < bin/zabbix
 
+# Module 3: one proxy, user and two groups per trainee, named after their
+# console login (every name in /root/users/consoles.txt; NAMES="a b" for only
+# some). Re-runnable; -delete removes everything they made (end of module 3).
+zabbix-users:
+	ssh $(S) 'bash -s' -- users $(NAMES) < bin/zabbix
+
+zabbix-users-delete:
+	ssh $(S) 'bash -s' -- users --delete $(NAMES) < bin/zabbix
+
 check:
 	$(KUBECTL) get nodes
 	$(KUBECTL) -n consoles get deploy,pods,ingress
@@ -127,7 +136,9 @@ help:
 	@echo "  apply       - render, then apply everything"
 	@echo "  restart     - Restart every console"
 	@echo "  zabbix      - Install / upgrade Zabbix (server, web, database) for the labs"
+	@echo "  zabbix-users        - Module 3: proxy, user, groups per trainee (NAMES= for some)"
+	@echo "  zabbix-users-delete - Module 3: remove them and everything the trainees made"
 	@echo "  check       - Consoles answer (401 = up, behind basic auth), dind is up"
 	@echo "  help        - Show this help message"
 
-.PHONY: all sysctl create delete kubeconfig edge headlamp image render secrets apply restart zabbix check help
+.PHONY: all sysctl create delete kubeconfig edge headlamp image render secrets apply restart zabbix zabbix-users zabbix-users-delete check help

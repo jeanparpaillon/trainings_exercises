@@ -15,14 +15,41 @@
 #             by the one of Secret zabbix/zabbix-admin, if it is still the
 #             default; prints where to read it.
 #
+#   ssh root@HOST 'bash -s' -- users [name…]            < bin/zabbix   module 3, before session 1
+#   ssh root@HOST 'bash -s' -- users --delete [name…]   < bin/zabbix   module 3, at the end
+#
+#   users     one confined tenant per trainee, named after their console login
+#             (default: every name in $USERS, as bin/secrets), through the API
+#             as Admin (module3/README.md, "The shared server"): host group
+#             and template group <name>, user group <name>, user <name>
+#             with the Admin role, active proxy <name> accepting PSK only
+#             (identity <name>). Then every tenant's rights: write on its two
+#             groups; read on the `Templates*` template groups, on the other
+#             tenants' host groups and on `Applications`, where discovered
+#             Kubernetes hosts land: everyone sees everyone's hosts.
+#             Re-runnable: creates what is missing, recomputes the rights and
+#             the user's groups, never rotates a password or a PSK. Those are
+#             kept in Secret zabbix/zabbix-user-<name>, created once, and
+#             copied into the trainee's namespace as Secret `zabbix-user`
+#             (name, password, psk_identity, psk, server, url), which
+#             module3/lab0 reads from the console.
+#   --delete  removes what the trainee made and the above: maintenances,
+#             actions, dashboards and maps, hosts and templates, then the
+#             proxy, user, groups and Secrets.
+#
 #   CTX       kubectl context (default kind-training-f021bis)
 #   NODE      kind node       (default training-f021bis-control-plane)
 #   URL       frontend        (default https://$(hostname -f)/zabbix/)
+#   USERS     the users file  (default /root/users/consoles.txt, `<name> …`)
+#   TRAPPER   what proxies connect to, copied into the trainees' Secrets
+#             (default 195.35.2.222:10051: the IP, see zabbix/server.yaml)
 set -euo pipefail
 
 CTX=${CTX:-kind-training-f021bis}
 NODE=${NODE:-training-f021bis-control-plane}
 URL=${URL:-https://$(hostname -f)/zabbix/}
+USERS=${USERS:-/root/users/consoles.txt}
+TRAPPER=${TRAPPER:-195.35.2.222:10051}
 SOCAT_IMAGE=alpine/socat:1.8.1.1
 k() { kubectl --context "$CTX" "$@"; }
 
@@ -36,10 +63,262 @@ secret() {   # secret <name>: create it with a random password unless it exists
   fi
 }
 
-# No jq on the server: the two answers used are matched with sed / grep.
+# admin needs two answers only, matched with sed / grep; users uses jq.
 api() {      # api <token|""> <json>: one JSON-RPC call, the response on stdout
   curl -fsS "${URL}api_jsonrpc.php" -H 'Content-Type: application/json-rpc' \
     ${1:+-H "Authorization: Bearer $1"} -d "$2"
+}
+
+# --- users -------------------------------------------------------------------
+# Passwords, PSKs and the session token never go on a command line (ps):
+# params come on stdin, secrets through the environment (jq's env.X), the
+# Authorization header from a file descriptor.
+
+TOKEN=
+rpc() {      # <params json> | rpc <method>: the call's result, dies on an API error
+  local out
+  out=$(jq -c --arg m "$1" '{jsonrpc: "2.0", method: $m, params: ., id: 1}' \
+    | curl -fsS "${URL}api_jsonrpc.php" -H 'Content-Type: application/json-rpc' \
+        -H @<([ -z "$TOKEN" ] || printf 'Authorization: Bearer %s\n' "$TOKEN") \
+        --data-binary @-)
+  if jq -e 'has("error")' <<<"$out" >/dev/null; then
+    echo "$1: $(jq -r '.error | "\(.message) \(.data)"' <<<"$out")" >&2
+    exit 1
+  fi
+  jq -c .result <<<"$out"
+}
+
+id_of() {    # id_of <object> <id field> <name field> <name>: its id, empty if none
+  jq -n --arg i "$2" --arg f "$3" --arg n "$4" '{output: [$i], filter: {($f): [$n]}}' \
+    | rpc "$1.get" | jq -r --arg i "$2" '.[0][$i] // empty'
+}
+
+ids() {      # <ids json array> | ids <object> <what>: delete them, say how many
+  local a n
+  a=$(cat)
+  n=$(jq length <<<"$a")
+  [ "$n" -gt 0 ] || return 0
+  rpc "$1.delete" <<<"$a" >/dev/null
+  printf '  %-14s %s deleted\n' "$2" "$n"
+}
+
+say() { printf '  %-14s %s\n' "$1" "$2"; }
+
+random() { openssl rand -base64 24 | tr -d '/+=' | head -c 24; }
+
+tenant_login() {
+  local pw
+  pw=$(k -n zabbix get secret zabbix-admin -o jsonpath='{.data.password}' | base64 -d)
+  TOKEN=$(PW=$pw jq -n '{username: "Admin", password: env.PW}' | rpc user.login | jq -r .)
+  trap 'rpc user.logout <<<"[]" >/dev/null || true' EXIT
+}
+
+tenant_list() {  # tenant_list [name…]: those names, or every name in $USERS
+  if [ $# -gt 0 ]; then
+    printf '%s\n' "$@"
+    return
+  fi
+  [ -r "$USERS" ] || { echo "users: no $USERS, and no name given" >&2; exit 1; }
+  local name _
+  while read -r name _; do
+    case $name in ''|'#'*) continue ;; esac
+    echo "$name"
+  done < "$USERS"
+}
+
+tenant_create() {  # tenant_create <name>
+  local p=$1
+  local gid tgid ugid uid pid roleid rights pw psk new=
+  echo "$p"
+
+  # Password and PSK first: they are what the server and the trainees share.
+  if k -n zabbix get secret "zabbix-user-$p" >/dev/null 2>&1; then
+    pw=$(k -n zabbix get secret "zabbix-user-$p" -o jsonpath='{.data.password}' | base64 -d)
+    psk=$(k -n zabbix get secret "zabbix-user-$p" -o jsonpath='{.data.psk}' | base64 -d)
+    say secret unchanged
+  else
+    pw=$(random)
+    psk=$(openssl rand -hex 32)     # 256 bits; Zabbix wants 32 to 512 hex digits
+    k -n zabbix create secret generic "zabbix-user-$p" \
+      --from-file=password=<(printf %s "$pw") --from-file=psk=<(printf %s "$psk") >/dev/null
+    new=1
+    say secret created
+  fi
+
+  gid=$(id_of hostgroup groupid name "$p")
+  if [ -z "$gid" ]; then
+    gid=$(jq -n --arg n "$p" '{name: $n}' | rpc hostgroup.create | jq -r '.groupids[0]')
+    say "host group" created
+  else
+    say "host group" unchanged
+  fi
+
+  tgid=$(id_of templategroup groupid name "$p")
+  if [ -z "$tgid" ]; then
+    tgid=$(jq -n --arg n "$p" '{name: $n}' | rpc templategroup.create | jq -r '.groupids[0]')
+    say "template group" created
+  else
+    say "template group" unchanged
+  fi
+
+  # Created with write on the trainee's own groups only; tenant_rights adds
+  # the read rights once every tenant exists.
+  ugid=$(id_of usergroup usrgrpid name "$p")
+  if [ -z "$ugid" ]; then
+    ugid=$(jq -n --arg n "$p" --arg g "$gid" --arg t "$tgid" \
+      '{name: $n, hostgroup_rights: [{id: $g, permission: 3}], templategroup_rights: [{id: $t, permission: 3}]}' \
+      | rpc usergroup.create | jq -r '.usrgrpids[0]')
+    say "user group" created
+  else
+    say "user group" unchanged
+  fi
+
+  roleid=$(id_of role roleid name "Admin role")
+  [ -n "$roleid" ] || { echo "users: no role \"Admin role\" on the server" >&2; exit 1; }
+  uid=$(id_of user userid username "$p")
+  if [ -z "$uid" ]; then
+    PW=$pw jq -n --arg n "$p" --arg r "$roleid" --arg u "$ugid" \
+      '{username: $n, passwd: env.PW, roleid: $r, usrgrps: [{usrgrpid: $u}]}' \
+      | rpc user.create >/dev/null
+    say user created
+  elif [ -n "$new" ]; then
+    # The Secret was lost but the user was not: the Secret is the truth.
+    PW=$pw jq -n --arg i "$uid" --arg r "$roleid" --arg u "$ugid" \
+      '{userid: $i, passwd: env.PW, roleid: $r, usrgrps: [{usrgrpid: $u}]}' \
+      | rpc user.update >/dev/null
+    say user "password reset (new Secret)"
+  else
+    jq -n --arg i "$uid" --arg r "$roleid" --arg u "$ugid" \
+      '{userid: $i, roleid: $r, usrgrps: [{usrgrpid: $u}]}' \
+      | rpc user.update >/dev/null
+    say user unchanged
+  fi
+
+  # 7.0 field names: name / operating_mode (0 = active); tls_accept 2 = PSK only.
+  pid=$(id_of proxy proxyid name "$p")
+  if [ -z "$pid" ]; then
+    PSK=$psk jq -n --arg n "$p" \
+      '{name: $n, operating_mode: 0, tls_accept: 2, tls_psk_identity: $n, tls_psk: env.PSK}' \
+      | rpc proxy.create >/dev/null
+    say proxy created
+  elif [ -n "$new" ]; then
+    PSK=$psk jq -n --arg i "$pid" --arg n "$p" \
+      '{proxyid: $i, tls_accept: 2, tls_psk_identity: $n, tls_psk: env.PSK}' \
+      | rpc proxy.update >/dev/null
+    say proxy "PSK reset (new Secret)"
+  else
+    say proxy unchanged
+  fi
+
+  if k get namespace "$p" >/dev/null 2>&1; then
+    k -n "$p" create secret generic zabbix-user \
+      --from-literal=name="$p" --from-literal=psk_identity="$p" \
+      --from-file=password=<(printf %s "$pw") --from-file=psk=<(printf %s "$psk") \
+      --from-literal=server="$TRAPPER" --from-literal=url="$URL" \
+      --dry-run=client -o yaml \
+      | k apply -f - >/dev/null
+    say console "Secret $p/zabbix-user"
+  else
+    say console "no namespace $p: no Secret for the console"
+  fi
+}
+
+tenant_rights() {  # every tenant's user group: rights recomputed from scratch
+  # Tenants are the zabbix-user-* Secrets, not $USERS: a run for some NAMES
+  # must still make the new tenant visible to the others, and the reverse.
+  local tenants templ apps p gid tgid ugid
+  tenants=$(k -n zabbix get secret -o name | sed -n 's|^secret/zabbix-user-||p')
+  # Read on every Templates* group as it is now (the shipped ones, and any
+  # the trainer adds before re-running).
+  templ=$(jq -n '{output: ["groupid"], search: {name: "Templates"}, startSearch: true}' \
+    | rpc templategroup.get | jq -c 'map({id: .groupid, permission: 2})')
+  # Everyone reads everyone's hosts (module3/README.md, lab 2): the other
+  # tenants' groups, and Applications, where the shipped Kubernetes
+  # templates' host prototypes put every discovered host.
+  apps=$(id_of hostgroup groupid name Applications)
+  [ -n "$apps" ] || echo "users: no host group Applications: discovered hosts stay hidden" >&2
+  local reads
+  reads=$(for p in $tenants; do id_of hostgroup groupid name "$p"; done; echo "$apps")
+  echo "rights"
+  for p in $tenants; do
+    gid=$(id_of hostgroup groupid name "$p")
+    tgid=$(id_of templategroup groupid name "$p")
+    ugid=$(id_of usergroup usrgrpid name "$p")
+    [ -n "$gid" ] && [ -n "$tgid" ] && [ -n "$ugid" ] || { say "$p" "incomplete tenant, skipped"; continue; }
+    jq -n --arg u "$ugid" --arg g "$gid" --arg t "$tgid" --argjson tp "$templ" \
+      --argjson r "$(jq -Rnc '[inputs | select(length > 0)]' <<<"$reads")" \
+      '{usrgrpid: $u,
+        hostgroup_rights: ([$r[] | select(. != $g) | {id: ., permission: 2}] + [{id: $g, permission: 3}]),
+        templategroup_rights: ([$tp[] | select(.id != $t)] + [{id: $t, permission: 3}])}' \
+      | rpc usergroup.update >/dev/null
+    say "$p" "write on its groups, read on $(($(grep -c . <<<"$reads") - 1)) host groups and Templates*"
+  done
+}
+
+tenant_delete() {  # tenant_delete <name>
+  local p=$1
+  local gid tgid ugid uid pid hosts
+  echo "$p"
+  gid=$(id_of hostgroup groupid name "$p")
+  tgid=$(id_of templategroup groupid name "$p")
+  ugid=$(id_of usergroup usrgrpid name "$p")
+  uid=$(id_of user userid username "$p")
+  pid=$(id_of proxy proxyid name "$p")
+
+  if [ -n "$gid" ]; then
+    hosts=$(jq -n --arg g "$gid" '{output: ["hostid"], groupids: [$g]}' | rpc host.get | jq -c 'map(.hostid)')
+    # Before the hosts: a maintenance left without hosts or groups is invalid,
+    # and the API refuses to delete its last host.
+    { jq -n --arg g "$gid" '{output: ["maintenanceid"], groupids: [$g]}' | rpc maintenance.get
+      if [ "$(jq length <<<"$hosts")" -gt 0 ]; then
+        jq -n --argjson h "$hosts" '{output: ["maintenanceid"], hostids: $h}' | rpc maintenance.get
+      fi
+    } | jq -sc 'add | map(.maintenanceid) | unique' | ids maintenance maintenances
+  fi
+
+  # Actions that send to the trainee, or filter on their host group: the API
+  # refuses to delete a user or group an operation still names.
+  jq -n '{output: ["actionid"], selectOperations: "extend", selectRecoveryOperations: "extend",
+          selectUpdateOperations: "extend", selectFilter: "extend"}' \
+    | rpc action.get \
+    | jq -c --arg u "${uid:--}" --arg ug "${ugid:--}" --arg g "${gid:--}" '
+        map(select(
+          ((.operations // []) + (.recovery_operations // []) + (.update_operations // [])
+            | any(((.opmessage_usr // []) | any(.userid == $u))
+                  or ((.opmessage_grp // []) | any(.usrgrpid == $ug))))
+          or ((.filter.conditions // []) | any(.conditiontype == "0" and .value == $g))
+        ) | .actionid)' \
+    | ids action actions
+
+  if [ -n "$uid" ]; then
+    jq -n '{output: ["dashboardid", "userid"]}' | rpc dashboard.get \
+      | jq -c --arg u "$uid" 'map(select(.userid == $u) | .dashboardid)' | ids dashboard dashboards
+    jq -n '{output: ["sysmapid", "userid"]}' | rpc map.get \
+      | jq -c --arg u "$uid" 'map(select(.userid == $u) | .sysmapid)' | ids map maps
+  fi
+
+  if [ -n "$gid" ]; then
+    # Hosts made by hand first: deleting one deletes what its discovery rules
+    # created; what remains (discovered from elsewhere) goes next.
+    jq -n --arg g "$gid" '{output: ["hostid", "flags"], groupids: [$g]}' | rpc host.get \
+      | jq -c 'map(select(.flags == "0") | .hostid)' | ids host hosts
+    jq -n --arg g "$gid" '{output: ["hostid"], groupids: [$g]}' | rpc host.get \
+      | jq -c 'map(.hostid)' | ids host "discovered"
+  fi
+  if [ -n "$tgid" ]; then
+    jq -n --arg g "$tgid" '{output: ["templateid"], groupids: [$g]}' | rpc template.get \
+      | jq -c 'map(.templateid)' | ids template templates
+  fi
+
+  [ -z "$pid" ]  || { jq -n --arg i "$pid"  '[$i]' | rpc proxy.delete >/dev/null;         say proxy deleted; }
+  [ -z "$uid" ]  || { jq -n --arg i "$uid"  '[$i]' | rpc user.delete >/dev/null;          say user deleted; }
+  [ -z "$ugid" ] || { jq -n --arg i "$ugid" '[$i]' | rpc usergroup.delete >/dev/null;     say "user group" deleted; }
+  [ -z "$tgid" ] || { jq -n --arg i "$tgid" '[$i]' | rpc templategroup.delete >/dev/null; say "template group" deleted; }
+  [ -z "$gid" ]  || { jq -n --arg i "$gid"  '[$i]' | rpc hostgroup.delete >/dev/null;     say "host group" deleted; }
+
+  k -n zabbix delete secret "zabbix-user-$p" --ignore-not-found >/dev/null
+  k -n "$p" delete secret zabbix-user --ignore-not-found >/dev/null 2>&1 || true
+  say secrets deleted
 }
 
 case ${1:-} in
@@ -70,8 +349,21 @@ case ${1:-} in
     fi
     echo "  $URL, user Admin, password: kubectl -n zabbix get secret zabbix-admin -o jsonpath='{.data.password}' | base64 -d"
     ;;
+  users)
+    shift
+    del=
+    if [ "${1:-}" = --delete ]; then del=1; shift; fi
+    list=$(tenant_list "$@")
+    [ -n "$list" ] || { echo "users: nobody in $USERS" >&2; exit 1; }
+    tenant_login
+    # fd 3: nothing in the loop may eat the list from stdin.
+    while read -r -u 3 name; do
+      if [ -n "$del" ]; then tenant_delete "$name"; else tenant_create "$name"; fi
+    done 3<<<"$list"
+    [ -n "$del" ] || tenant_rights
+    ;;
   *)
-    echo "usage: bin/zabbix secrets|forward|admin" >&2
+    echo "usage: bin/zabbix secrets|forward|admin|users [--delete] [name…]" >&2
     exit 2
     ;;
 esac
