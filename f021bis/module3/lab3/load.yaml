@@ -1,0 +1,52 @@
+# Lab 3 step 1: traffic for podinfo, so that its counters and its histogram
+# have something to show. Inside the cluster, through the Service, ~3
+# requests per second: mostly `/`, one in ten `/status/500`, one in ten
+# `/delay/1`.
+#
+#   kubectl apply -f lab3/load.yaml
+#   kubectl -n podinfo logs deploy/load          # one line per 100 requests
+#
+# The mix is PATHS, read in turn. Lab 4's `break workload` replaces it with
+# `/status/500` only (`kubectl set env`), `reset` puts this one back.
+#
+# podinfo's image: it has curl, and it is in both nodes already (make -C
+# lab0 load).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: load
+  namespace: podinfo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: load
+  template:
+    metadata:
+      labels:
+        app: load
+    spec:
+      containers:
+        - name: load
+          image: ghcr.io/stefanprodan/podinfo:6.15.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: TARGET
+              value: http://podinfo.podinfo.svc:9898
+            - name: PATHS
+              value: / / / / / / / / /status/500 /delay/1
+          command:
+            - sh
+            - -c
+            - |
+              n=0
+              while true; do
+                for p in $PATHS; do
+                  curl -s -o /dev/null -m 5 "$TARGET$p"
+                  n=$((n + 1)); [ $((n % 100)) -ne 0 ] || echo "$(date +%T) $n requests, PATHS=$PATHS"
+                  sleep 0.2
+                done
+              done
+          resources:
+            requests: {cpu: 10m, memory: 8Mi}
+            limits: {memory: 32Mi}

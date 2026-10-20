@@ -1,0 +1,27 @@
+# Lab 3 step 1: podinfo, with its chart (PODINFO_CHART_VERSION), into
+# namespace podinfo.
+#
+#   helm install podinfo lab0/charts/podinfo-$PODINFO_CHART_VERSION.tgz \
+#     -n podinfo --create-namespace -f lab3/step1-podinfo/values.yaml --wait
+
+# One replica: Zabbix reads /metrics through the Service, and a Service
+# with two pods answers from either — two sets of counters, read in turn.
+# Step 4 shows what that does.
+replicaCount: 1
+
+# Off the control plane, i.e. on the worker: lab 4 pauses the worker, and
+# podinfo must go with it.
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: node-role.kubernetes.io/control-plane
+              operator: DoesNotExist
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 16Mi
+  limits:
+    memory: 64Mi

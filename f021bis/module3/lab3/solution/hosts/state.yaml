@@ -1,0 +1,23 @@
+zabbix_export:
+  version: '7.0'
+  hosts:
+    - host: '${ZBX_USER} mon state'
+      name: '${ZBX_USER} mon state'
+      monitored_by: PROXY
+      proxy:
+        name: ${ZBX_USER}
+      templates:
+        - name: 'Kubernetes cluster state by HTTP'
+      groups:
+        - name: ${ZBX_USER}
+      macros:
+        - macro: '{$HTTP.TLS.VERIFY}'
+          value: none
+        - macro: '{$KUBE.API.TOKEN}'
+          type: SECRET_TEXT
+        - macro: '{$KUBE.API.URL}'
+          value: 'https://kubernetes.default.svc:443'
+        - macro: '{$KUBE.LLD.FILTER.NAMESPACE.MATCHES}'
+          value: ^(default|kube-system|podinfo)$
+      inventory_mode: DISABLED
+

@@ -1,0 +1,44 @@
+# Solution of lab 1 step 2 (unchanged in labs 2 and 3): ~/m3/values.yaml, with ${ZBX_USER}, ${ZBX_SERVER}
+# and ${ZABBIX_VERSION} in place of your values (the catch-up fills them in).
+
+zabbixProxy:
+  image:
+    tag: alpine-${ZABBIX_VERSION}
+  # A list replaces the chart's list as a whole: everything the chart set and
+  # that you still want must be repeated here (ZBX_PROXYCONFIGFREQUENCY…).
+  env:
+    - name: ZBX_PROXYMODE         # 0 = active: the proxy opens the connection
+      value: 0
+    - name: ZBX_HOSTNAME          # the proxy's name, as declared on the server
+      value: ${ZBX_USER}
+    - name: ZBX_SERVER_HOST       # <IP>:<port> of the server's trapper
+      value: "${ZBX_SERVER}"
+    - name: ZBX_TLSCONNECT        # how the proxy connects to the server
+      value: psk
+    - name: ZBX_TLSPSKIDENTITY
+      value: ${ZBX_USER}
+    - name: ZBX_TLSPSKFILE        # a name relative to /var/lib/zabbix/enc/,
+      value: psk                  # where the Secret is mounted (below)
+    - name: ZBX_PROXYCONFIGFREQUENCY   # s between two configuration syncs
+      value: 10
+    - name: ZBX_CACHESIZE
+      value: 128M
+    - name: ZBX_DEBUGLEVEL
+      value: 3
+  # The chart's `env` only takes literal values (no valueFrom): the PSK is
+  # read from a file, a Secret mounted where the image looks for TLS files.
+  extraVolumes:
+    - name: psk
+      secret:
+        secretName: zabbix-proxy-psk
+  extraVolumeMounts:
+    - name: psk
+      mountPath: /var/lib/zabbix/enc
+      readOnly: true
+
+zabbixAgent:
+  image:
+    tag: alpine-${ZABBIX_VERSION}
+  # The agent listens on the node's own address, <node IP>:10050: that is
+  # the interface of the hosts you create in step 4.
+  hostNetwork: true

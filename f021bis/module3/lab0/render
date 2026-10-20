@@ -6,4 +6,15 @@
 #
 # The solutions (labN/solution/) use ${ZBX_USER}, ${ZBX_SERVER}, ${CLUSTER},
 # ${ZABBIX_VERSION}, and ${CP_IP} / ${WORKER_IP} for the nodes' addresses.
-exec perl -pe 's/\$\{(\w+)\}/exists $ENV{$1} ? $ENV{$1} : $&/ge' "$@"
+#
+# ${UUID:<seed>} becomes a uuid made of ZBX_USER and the seed: the same on
+# every render, different for every trainee. A template import needs a uuid
+# on each object, unique across the server, and a version 4 one (lab 3):
+# the md5's 13th digit set to 4, its 17th to 8, 9, a or b.
+exec perl -MDigest::MD5=md5_hex -pe '
+  sub uuid { my $h = md5_hex("$ENV{ZBX_USER}/$_[0]");
+             substr($h, 12, 1) = "4";
+             substr($h, 16, 1) = (8, 9, "a", "b")[hex(substr($h, 16, 1)) & 3];
+             $h }
+  s/\$\{UUID:([^}]+)\}/uuid($1)/ge;
+  s/\$\{(\w+)\}/exists $ENV{$1} ? $ENV{$1} : $&/ge' "$@"

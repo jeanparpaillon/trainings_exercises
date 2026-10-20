@@ -41,13 +41,14 @@ module2/README.md          Ansible for Kubernetes: spec of labs 1-3 (kubernetes.
 module3/README.md          Zabbix: spec of labs 1-4 (3 trainees, alone, one proxy
                            each on the room's Zabbix 7.0, discovery, Prometheus
                            metrics, alerts + drill), lab0; bin/zabbix users is
-                           written (tested locally). lab0, lab1 and
-                           catch-up-lab1 written and run on a laptop against a
-                           local copy of the room's Zabbix, not on the server;
-                           labs 2-4 not written. lab0/zapi = the API as the
-                           trainee (role Admin: no Administration menu, no
-                           configuration.import of hosts linked to shipped
-                           templates — lab0/import)
+                           written (tested locally). lab0, labs 1-3 and
+                           catch-up-lab1/2/3 written and validated on the
+                           server (console-jean); lab 4 not written. lab0/zapi
+                           = the API as the trainee (role Admin: no
+                           Administration menu, no configuration.import of
+                           hosts linked to shipped templates — lab0/import).
+                           Template exports need per-trainee v4 uuids:
+                           ${UUID:<seed>} in solutions, made by lab0/render
 module4/README.md          Ansible certification: spec of labs 1-5, lab0, exam
                            (step files not written, nothing run yet)
 ```

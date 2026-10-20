@@ -10,6 +10,9 @@
 #                        nodes` / `<name> mon state`), the chart's token set in their
 #                        {$KUBE.API.TOKEN}; controller manager and scheduler bound
 #                        to 0.0.0.0. Discovery then recreates the rest in ~1 min
+#   make catch-up-lab3   the same with lab3/solution, plus podinfo and its load in
+#                        namespace podinfo, your template `<name> podinfo by HTTP`
+#                        imported (made to match the file) before the hosts
 #
 # The pieces are targets too (mon, chart, …); the step files show the
 # commands they run, this is only for getting back on track.
@@ -20,6 +23,7 @@ SHELL   := /bin/bash
 M3      ?= $(HOME)/m3
 ZBX_ENV ?= $(HOME)/.zabbix/user.env
 CHART_TGZ := lab0/charts/$(ZABBIX_CHART)-$(ZABBIX_CHART_VERSION).tgz
+PODINFO_TGZ := lab0/charts/$(PODINFO_CHART)-$(PODINFO_CHART_VERSION).tgz
 
 # Every recipe line starts with this: your user.env, and kubectl / helm on
 # kind-$CLUSTER whatever the current context is.
@@ -34,6 +38,10 @@ catch-up-lab1: mon
 catch-up-lab2: mon
 	$(MAKE) m3 LAB=lab2
 	$(MAKE) chart control-plane hosts token
+
+catch-up-lab3: mon
+	$(MAKE) m3 LAB=lab3
+	$(MAKE) chart control-plane podinfo templates hosts token
 
 mon:
 	@test -r $(ZBX_ENV) || { echo "no $(ZBX_ENV): make -C lab0 credentials"; exit 1; }
@@ -67,6 +75,24 @@ chart:
 	  k -n monitoring rollout restart deploy/zabbix-zabbix-helm-chart-proxy >/dev/null; \
 	  k -n monitoring rollout status deploy/zabbix-zabbix-helm-chart-proxy --timeout=180s
 
+# Lab 3 step 1: podinfo, one replica on the worker, and its load.
+podinfo:
+	$(ENV); helm --kube-context "kind-$$CLUSTER" upgrade --install podinfo $(PODINFO_TGZ) \
+	    -n podinfo --create-namespace -f lab3/step1-podinfo/values.yaml --wait --timeout 180s; \
+	  k apply -f lab3/load.yaml
+
+# Your templates on the server: every template of template group <name>
+# deleted (unlinked from your hosts, their items with them), then
+# ~/m3/templates/ imported — before the hosts that link them. Deleted rather
+# than updated: an import finds a template by uuid, and yours, made in the
+# UI, has others than the solution's.
+templates:
+	$(ENV); \
+	  gid=$$(lab0/zapi templategroup.get "$$(jq -nc --arg n "$$ZBX_USER" '{output: ["groupid"], filter: {name: [$$n]}}')" | jq -r '.[0].groupid'); \
+	  ids=$$(lab0/zapi template.get "$$(jq -nc --arg g "$$gid" '{output: ["templateid"], groupids: [$$g]}')" | jq -c 'map(.templateid)'); \
+	  [ "$$ids" = '[]' ] || { lab0/zapi template.delete "$$ids" >/dev/null && echo "templates deleted: $$ids"; }; \
+	  lab0/import $(M3)/templates/*.yaml
+
 # Your hosts on the server: every host of host group <name> deleted (with
 # what their discovery rules created), then ~/m3/hosts/ imported (lab0/import:
 # why not a plain configuration.import).
@@ -94,4 +120,4 @@ token:
 	      TOK=$$tok jq -nc --arg i "$$id" '{hostmacroid: $$i, value: env.TOK, type: 1}' \
 	        | lab0/zapi usermacro.update - >/dev/null && echo "token set: macro $$id"; done
 
-.PHONY: catch-up-lab1 catch-up-lab2 mon m3 chart hosts control-plane token
+.PHONY: catch-up-lab1 catch-up-lab2 catch-up-lab3 mon m3 chart podinfo templates hosts control-plane token

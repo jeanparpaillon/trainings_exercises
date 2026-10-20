@@ -9,6 +9,11 @@
 # are taken out of the file, the rest is imported, then the templates are
 # linked with host.massadd.
 #
+# A template export (lab 3: a template of your own, in your template group)
+# is imported as it is, items and discovery rules made to match the file:
+# what is on the server and not in the file is deleted. Import templates
+# before the hosts linked to them.
+#
 # Relies on the layout of a 7.0 export: a host's keys indented by 6
 # spaces under `  hosts:`, its templates as `        - name: …` under
 # `      templates:`.
@@ -18,6 +23,16 @@ here=$(cd "$(dirname "$0")" && pwd)
 [ $# -gt 0 ] || { echo "usage: lab0/import <export.yaml>…" >&2; exit 2; }
 
 for f in "$@"; do
+  if grep -q '^  templates:$' "$f"; then
+    all='{createMissing: true, updateExisting: true, deleteMissing: true}'
+    P=$(cat "$f") jq -nc "{format: \"yaml\", source: env.P, rules: {
+        templates: {createMissing: true, updateExisting: true},
+        items: $all, discoveryRules: $all, triggers: $all, graphs: $all,
+        templateDashboards: $all, valueMaps: $all}}" \
+      | "$here/zapi" configuration.import - >/dev/null
+    echo "imported $f"
+    continue
+  fi
   # host<TAB>template, one line per link.
   links=$(awk '
     /^    - host: /           { host = substr($0, index($0, "host: ") + 6); gsub(/^\x27|\x27$/, "", host); next }

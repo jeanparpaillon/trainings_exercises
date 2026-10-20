@@ -1,7 +1,7 @@
 # Module 3 — chart, images and Zabbix credentials, in your console.
 # From module3/:
 #
-#   make -C lab0 chart         the Zabbix chart as lab0/charts/<chart>-<version>.tgz
+#   make -C lab0 chart         the Zabbix and podinfo charts as lab0/charts/<chart>-<version>.tgz
 #   make -C lab0 pull          the images of the module into your Docker
 #   make -C lab0 load          …and into the nodes of $(CLUSTER) (lab 1 step 1)
 #   make -C lab0 credentials   ~/.zabbix/user.env and ~/.zabbix/user.psk, from
@@ -29,6 +29,7 @@ ZBX_API        ?= http://zabbix-web.zabbix.svc:8080/api_jsonrpc.php
 
 CHARTS_DIR := charts
 CHART_TGZ  := $(CHARTS_DIR)/$(ZABBIX_CHART)-$(ZABBIX_CHART_VERSION).tgz
+PODINFO_TGZ := $(CHARTS_DIR)/$(PODINFO_CHART)-$(PODINFO_CHART_VERSION).tgz
 
 IMAGES := zabbix/zabbix-proxy-sqlite3:alpine-$(ZABBIX_VERSION) \
           zabbix/zabbix-agent2:alpine-$(ZABBIX_VERSION) \
@@ -39,11 +40,16 @@ IMAGES := zabbix/zabbix-proxy-sqlite3:alpine-$(ZABBIX_VERSION) \
 CONSOLES_KUBECONFIG ?= ../../shared-cluster/kubeconfig
 CONSOLES_KUBECTL := kubectl --kubeconfig=$(CONSOLES_KUBECONFIG) --context=training-f021bis -n consoles
 
-chart: $(CHART_TGZ)
+chart: $(CHART_TGZ) $(PODINFO_TGZ)
 
 $(CHART_TGZ):
 	mkdir -p $(CHARTS_DIR)
 	helm pull $(ZABBIX_CHART) --repo $(ZABBIX_CHART_REPO) --version $(ZABBIX_CHART_VERSION) -d $(CHARTS_DIR)
+
+# Lab 3's application.
+$(PODINFO_TGZ):
+	mkdir -p $(CHARTS_DIR)
+	helm pull $(PODINFO_CHART) --repo $(PODINFO_CHART_REPO) --version $(PODINFO_CHART_VERSION) -d $(CHARTS_DIR)
 
 # One platform only: with the containerd image store (the default of the
 # console's Docker 29), `docker pull` fetches the content of one platform of
@@ -74,7 +80,8 @@ check:
 	@ok() { printf '  %-36s %s\n' "$$1" "$$2"; }; \
 	for t in kind kubectl helm docker curl git jq nc; do \
 	  ok $$t "$$(command -v $$t >/dev/null 2>&1 && echo ok || echo MISSING)"; done; \
-	ok chart "$$(test -f $(CHART_TGZ) && echo $(CHART_TGZ) || echo 'MISSING (make -C lab0 chart)')"; \
+	for c in $(CHART_TGZ) $(PODINFO_TGZ); do \
+	  ok "$$(basename $$c)" "$$(test -f $$c && echo ok || echo 'MISSING (make -C lab0 chart)')"; done; \
 	for i in $(IMAGES) $(KIND_NODE); do \
 	  ok "$$(echo $${i%@*} | sed 's|.*/||')" "$$(docker image inspect $$i >/dev/null 2>&1 && echo ok || echo 'MISSING (make -C lab0 pull)')"; done; \
 	if [ ! -r $(ZBX_DIR)/user.env ]; then ok credentials 'MISSING (make -C lab0 credentials)'; exit 0; fi; \

@@ -1,0 +1,244 @@
+zabbix_export:
+  version: '7.0'
+  templates:
+    - uuid: ${UUID:template}
+      template: '${ZBX_USER} podinfo by HTTP'
+      name: '${ZBX_USER} podinfo by HTTP'
+      groups:
+        - name: ${ZBX_USER}
+      items:
+        - uuid: ${UUID:podinfo.duration.count.rate}
+          name: 'podinfo: requests timed per second'
+          type: DEPENDENT
+          key: podinfo.duration.count.rate
+          delay: '0'
+          value_type: FLOAT
+          units: rps
+          preprocessing:
+            - type: PROMETHEUS_PATTERN
+              parameters:
+                - http_request_duration_seconds_count
+                - function
+                - sum
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+          master_item:
+            key: podinfo.metrics
+        - uuid: ${UUID:podinfo.duration.le05.rate}
+          name: 'podinfo: requests under 0.5 s per second'
+          type: DEPENDENT
+          key: podinfo.duration.le05.rate
+          delay: '0'
+          value_type: FLOAT
+          units: rps
+          preprocessing:
+            - type: PROMETHEUS_PATTERN
+              parameters:
+                - 'http_request_duration_seconds_bucket{le="0.5"}'
+                - function
+                - sum
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+          master_item:
+            key: podinfo.metrics
+        - uuid: ${UUID:podinfo.duration.sum.rate}
+          name: 'podinfo: time spent per second'
+          type: DEPENDENT
+          key: podinfo.duration.sum.rate
+          delay: '0'
+          value_type: FLOAT
+          units: s
+          preprocessing:
+            - type: PROMETHEUS_PATTERN
+              parameters:
+                - http_request_duration_seconds_sum
+                - function
+                - sum
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+          master_item:
+            key: podinfo.metrics
+        - uuid: ${UUID:podinfo.errors.rate}
+          name: 'podinfo: 5xx per second'
+          type: DEPENDENT
+          key: podinfo.errors.rate
+          delay: '0'
+          value_type: FLOAT
+          units: rps
+          preprocessing:
+            - type: PROMETHEUS_PATTERN
+              parameters:
+                - 'http_requests_total{status=~"5.."}'
+                - function
+                - sum
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+          master_item:
+            key: podinfo.metrics
+        - uuid: ${UUID:podinfo.ksm.metrics}
+          name: 'podinfo: kube-state-metrics'
+          type: HTTP_AGENT
+          key: podinfo.ksm.metrics
+          history: '0'
+          value_type: TEXT
+          trends: '0'
+          url: '{$PODINFO.KSM.URL}'
+        - uuid: ${UUID:podinfo.latency.mean}
+          name: 'podinfo: mean latency'
+          type: CALCULATED
+          key: podinfo.latency.mean
+          delay: 30s
+          value_type: FLOAT
+          units: s
+          params: last(//podinfo.duration.sum.rate)/last(//podinfo.duration.count.rate)
+        - uuid: ${UUID:podinfo.latency.p95}
+          name: 'podinfo: p95 latency'
+          type: CALCULATED
+          key: podinfo.latency.p95
+          delay: 30s
+          value_type: FLOAT
+          units: s
+          params: 'bucket_percentile(//podinfo.bucket[*],5m,95)'
+        - uuid: ${UUID:podinfo.latency.under05}
+          name: 'podinfo: requests under 0.5 s'
+          type: CALCULATED
+          key: podinfo.latency.under05
+          delay: 30s
+          value_type: FLOAT
+          units: '%'
+          params: '100*last(//podinfo.duration.le05.rate)/last(//podinfo.duration.count.rate)'
+        - uuid: ${UUID:podinfo.metrics}
+          name: 'podinfo: metrics'
+          type: HTTP_AGENT
+          key: podinfo.metrics
+          delay: 30s
+          history: '0'
+          value_type: TEXT
+          trends: '0'
+          url: '{$PODINFO.URL}'
+        - uuid: ${UUID:podinfo.requests.rate}
+          name: 'podinfo: requests per second'
+          type: DEPENDENT
+          key: podinfo.requests.rate
+          delay: '0'
+          value_type: FLOAT
+          units: rps
+          preprocessing:
+            - type: PROMETHEUS_PATTERN
+              parameters:
+                - http_requests_total
+                - function
+                - sum
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+          master_item:
+            key: podinfo.metrics
+        - uuid: ${UUID:podinfo.rollout.stuck}
+          name: 'podinfo: rollout stuck'
+          type: DEPENDENT
+          key: podinfo.rollout.stuck
+          delay: '0'
+          preprocessing:
+            - type: PROMETHEUS_PATTERN
+              parameters:
+                - 'kube_deployment_status_condition{namespace="{$PODINFO.NAMESPACE}",deployment="{$PODINFO.DEPLOYMENT}",condition="Progressing",status="false"}'
+                - value
+                - ''
+          master_item:
+            key: podinfo.ksm.metrics
+        - uuid: ${UUID:podinfo.started}
+          name: 'podinfo: started'
+          type: DEPENDENT
+          key: podinfo.started
+          delay: '0'
+          value_type: FLOAT
+          units: unixtime
+          preprocessing:
+            - type: PROMETHEUS_PATTERN
+              parameters:
+                - process_start_time_seconds
+                - value
+                - ''
+          master_item:
+            key: podinfo.metrics
+      discovery_rules:
+        - uuid: ${UUID:podinfo.buckets.discovery}
+          name: 'podinfo: latency buckets discovery'
+          type: DEPENDENT
+          key: podinfo.buckets.discovery
+          delay: '0'
+          item_prototypes:
+            - uuid: ${UUID:podinfo.bucket.prototype}
+              name: 'podinfo: requests under {#LE} s'
+              type: DEPENDENT
+              key: 'podinfo.bucket[{#LE}]'
+              delay: '0'
+              value_type: FLOAT
+              preprocessing:
+                - type: PROMETHEUS_PATTERN
+                  parameters:
+                    - 'http_request_duration_seconds_bucket{le="{#LE}"}'
+                    - function
+                    - sum
+              master_item:
+                key: podinfo.metrics
+          master_item:
+            key: podinfo.metrics
+          lld_macro_paths:
+            - lld_macro: '{#LE}'
+              path: $.labels.le
+          preprocessing:
+            - type: PROMETHEUS_TO_JSON
+              parameters:
+                - 'http_request_duration_seconds_bucket{path="metrics"}'
+        - uuid: ${UUID:podinfo.requests.discovery}
+          name: 'podinfo: requests discovery'
+          type: DEPENDENT
+          key: podinfo.requests.discovery
+          delay: '0'
+          item_prototypes:
+            - uuid: ${UUID:podinfo.requests.rate.prototype}
+              name: 'podinfo: /{#PATH} {#STATUS} per second'
+              type: DEPENDENT
+              key: 'podinfo.requests.rate[{#PATH},{#STATUS}]'
+              delay: '0'
+              value_type: FLOAT
+              units: rps
+              preprocessing:
+                - type: PROMETHEUS_PATTERN
+                  parameters:
+                    - 'http_request_duration_seconds_count{path="{#PATH}",status="{#STATUS}"}'
+                    - function
+                    - sum
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ''
+              master_item:
+                key: podinfo.metrics
+          master_item:
+            key: podinfo.metrics
+          lld_macro_paths:
+            - lld_macro: '{#PATH}'
+              path: $.labels.path
+            - lld_macro: '{#STATUS}'
+              path: $.labels.status
+          preprocessing:
+            - type: PROMETHEUS_TO_JSON
+              parameters:
+                - http_request_duration_seconds_count
+      macros:
+        - macro: '{$PODINFO.DEPLOYMENT}'
+          value: podinfo
+        - macro: '{$PODINFO.KSM.URL}'
+          value: 'http://zabbix-kube-state-metrics.monitoring.svc:8080/metrics'
+          description: 'kube-state-metrics of the cluster podinfo runs in'
+        - macro: '{$PODINFO.NAMESPACE}'
+          value: podinfo
+        - macro: '{$PODINFO.URL}'
+          value: 'http://podinfo.podinfo.svc:9898/metrics'
+          description: 'podinfo''s /metrics: the Service, or one pod'

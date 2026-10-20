@@ -5,12 +5,15 @@ are in `../../../trainings/f021bis/slides/module3.md`; every lab here names
 the slides it belongs to, and the slides point back with
 `📖 module3/README.md — Lab N`.
 
-> **Status: labs 1 and 2 written and validated on the server**
+> **Status: labs 1, 2 and 3 written and validated on the server**
 > (2026-10-20, `console-jean`), with `lab0/`, `versions.env`, `make
-> catch-up-lab1` and `catch-up-lab2`; findings in each lab's README. One
+> catch-up-lab1`, `-lab2` and `-lab3`; findings in each lab's README. One
 > open decision: tenants cannot delete their parent hosts once discovery
 > has run ([`lab2/README.md`](lab2/README.md#validated-on-the-server)).
-> Labs 3 and 4 are still a **specification**: facts about the Kubernetes
+> Lab 3 departs from its specification where the run disagreed with it
+> (one podinfo replica, p95 computed in Zabbix, another kube-state-metrics
+> metric: [`lab3/README.md`](lab3/README.md#validated-on-the-server)).
+> Lab 4 is still a **specification**: facts about the Kubernetes
 > templates shipped with 7.0 are from their documentation or read off a
 > server, not from a run, and are marked **(to validate)** where a step
 > depends on them.
@@ -153,7 +156,8 @@ for the demos.
   targets import those exports back; they are also the solutions
   (`labN/solution/`, YAML with `${ZBX_USER}`, `${CLUSTER}`, `${CP_IP}`… in
   place of the trainee's values, filled in by `lab0/render`: the console
-  has no `envsubst`). **A tenant cannot `configuration.import` a host linked
+  has no `envsubst`; `${UUID:<seed>}` for a template's uuids, one set per
+  trainee). **A tenant cannot `configuration.import` a host linked
   to a shipped template** (it only reads them: `Template "…" for host "…"
   does not exist`); `lab0/import` imports without the links and adds them
   with `host.massadd`, which is allowed. Templates of their own (lab 3)
@@ -183,8 +187,10 @@ PSK, podinfo from lab 3 on), replace `~/m3` by `labN/solution/` rendered
 for the trainee and their nodes' current IPs, delete the hosts of host
 group `<name>` on the server and import `~/m3/hosts/` with `lab0/import`.
 `catch-up-lab1` is written: ~1 min 10 s from no cluster, ~50 s on an
-existing one (laptop). The pieces are targets (`mon`, `m3 LAB=…`, `chart`,
-`hosts`) for the next labs to reuse. Keep them in sync when an end state
+existing one (laptop). `catch-up-lab3` also installs podinfo and its load,
+and imports `~/m3/templates/` before the hosts. The pieces are targets
+(`mon`, `m3 LAB=…`, `chart`, `podinfo`, `templates`, `hosts`) for the next
+labs to reuse. Keep them in sync when an end state
 changes.
 
 ## Prerequisites
@@ -194,7 +200,7 @@ changes.
 | `kubectl`, `kind`, `helm` (v4), `docker`, `curl`, `git` | console image |
 | `jq`, `nc`, `perl` | console image (`jq`, `netcat-openbsd` in its Dockerfile; `perl` in every Ubuntu image). No `envsubst`: `lab0/render` |
 | `zabbix_get` | in the proxy image (`kubectl exec` into the proxy pod); not installed in the console |
-| Zabbix Helm chart | `lab0 chart`: the `.tgz` at `ZABBIX_CHART_VERSION` into `lab0/charts/` (git-ignored), installed from the file (no network dependency on the day) |
+| Zabbix and podinfo Helm charts | `lab0 chart`: the `.tgz` at `ZABBIX_CHART_VERSION` and `PODINFO_CHART_VERSION` into `lab0/charts/` (git-ignored), installed from the file (no network dependency on the day) |
 | images | `lab0 pull`: proxy, agent2, kube-state-metrics, podinfo, `KIND_NODE`, into the console's Docker, single platform; `lab0 load` in lab 1 (`kind load image-archive`: `kind load docker-image` fails with the containerd image store) |
 
 ### Versions
@@ -207,7 +213,7 @@ All in [`versions.env`](versions.env) (same format as modules 1 and 2):
 | `ZABBIX_VERSION` | `7.0.31` | **must match the server** (`../shared-cluster/zabbix/kustomization.yaml`): same major for the proxy to be accepted; same tag for the agents, to keep one version in the room |
 | `ZABBIX_CHART`, `ZABBIX_CHART_VERSION` | `zabbix-helm-chart` `1.3.4` | official chart, repository `ZABBIX_CHART_REPO` = `https://cdn.zabbix.com/zabbix/integrations/kubernetes-helm/7.0`; appVersion 7.0.17, image tags overridden. The older name `zabbix-helm-chrt` stops at 1.2.4. Release `zabbix` → `zabbix-zabbix-helm-chart-*`, the endpoint names the 7.0 templates default to |
 | `KSM_VERSION` | `v2.9.2` | the chart's dependency (kube-state-metrics chart 5.7.0); the cluster state template relies on its metric names. Not run yet: it crash-looped on the laptop for lack of inotify instances, see lab 1 |
-| `PODINFO_CHART_VERSION` | `6.15.0` | module 2's; podinfo exposes Prometheus metrics on `:9898/metrics` |
+| `PODINFO_CHART`, `PODINFO_CHART_VERSION` | `podinfo` `6.15.0` | module 2's, repository `PODINFO_CHART_REPO` = `https://stefanprodan.github.io/podinfo`; podinfo exposes Prometheus metrics on `:9898/metrics`. The chart hard-codes `maxUnavailable: 1` (lab 3 step 4) |
 
 ## Lab 1 — Connect a cluster to Zabbix (session 1)
 
@@ -372,51 +378,56 @@ in Zabbix*, *Lab 3 — Prometheus metrics in Zabbix*. 65 min.
 | 4 | a template of your own | 15 min |
 | 5 | export, commit | 5 min |
 
-1. **step1-podinfo** — podinfo with its chart at `PODINFO_CHART_VERSION`,
-   namespace `podinfo`, 2 replicas; given `lab3/load.yaml`, a pod running a
-   `curl` loop against podinfo, mostly `/`, some `/status/500` and
-   `/delay/1` (so that errors and latency exist). Read the raw metrics:
-   `kubectl -n podinfo port-forward svc/podinfo 9898` and `curl
-   localhost:9898/metrics`. Find the counter of requests by status, the
-   latency histogram, the Go runtime metrics. Question: which of these is
-   worth an alert, which a graph, which nothing?
-2. **step2-items** — host `<name> podinfo` in group `<name>`, monitored by proxy
-   `<name>`, no interface. Master item: *HTTP agent* on
-   `http://podinfo.podinfo.svc:9898/metrics`, history 0 (keep nothing of
-   the raw text), every 30 s. Dependent items with preprocessing
-   *Prometheus pattern*: requests per status (`http_requests_total{status="200"}`
-   then *Change per second*), errors per second (`status=~"5.."`, sum),
-   p95 latency **(to validate: Prometheus pattern cannot compute quantiles
-   from buckets — use the histogram's `_sum`/`_count` for a mean instead,
-   and say why on the slide)**. Question: one HTTP request feeds N items —
-   what does that save compared with N HTTP items, and what breaks when the
-   master item fails?
-3. **step3-lld** — a discovery rule, dependent on the master item,
-   preprocessing *Prometheus to JSON* on `http_requests_total`, LLD macros
-   `{#STATUS}` and `{#PATH}` from the labels; item prototypes per status
-   and path. Watch new items appear when the load hits a new path. Question:
-   which label must never be a discovery key (pod name, request ID: the
-   cardinality problem the slides end on)?
-4. **step4-template** — move all of it into a template `<name> podinfo by HTTP`, in
-   template group `<name>`, with a macro `{$PODINFO.URL}`; unlink nothing
-   by hand: create the template, *link* it to the host, delete the host's
-   own items. Point it, with the macro, at the second replica's pod IP
-   directly: does the template work for any podinfo? Then do the same for
-   one thing the cluster state template does not have, from
-   kube-state-metrics (e.g. `kube_deployment_status_replicas_unavailable`
-   for the `podinfo` deployment) — the same technique on a metric the
-   cluster already exposes. Question: when would they rather use the
-   agent2 Prometheus plugin or the kube-state-metrics template items
-   already there?
-5. **step5-export** — export the template into `~/m3/templates/`, commit,
-   tag `lab3`. Question, for the wrap-up of the module: who owns this file
-   in their organisation, the application team or the monitoring team, and
-   how does it reach the server (by hand, the API, `community.zabbix` from
-   module 2)? Optional, if time: import it with `community.zabbix` from the
-   module 2 venv **(to decide: whether lab0 installs the collection)**.
+**Written**: [`lab3/`](lab3/) — the step files are the reference; this is
+their outline. Where it departs from the first specification, the run
+decided ([`lab3/README.md`](lab3/README.md#validated-on-the-server)).
 
-**End state** (start of lab 4): podinfo under load in `podinfo`; template
-`<name> podinfo by HTTP` linked to host `<name> podinfo`; `~/m3` tagged `lab3`.
+1. **step1-podinfo** — podinfo with its chart at `PODINFO_CHART_VERSION`,
+   namespace `podinfo`, **one replica** off the control plane
+   (`lab3/step1-podinfo/values.yaml`); `lab3/load.yaml`, a Deployment
+   running a `curl` loop against the Service, ~3 requests/s, `/` mostly,
+   one in ten `/status/500`, one in ten `/delay/1`, the mix in `PATHS`
+   (lab 4's `break workload` changes it). Read the raw metrics through a
+   port-forward: `http_requests_total{status}`, the histogram
+   `http_request_duration_seconds{method,path,status}` (`path` is the
+   route: bounded), `process_start_time_seconds`, the Go runtime.
+2. **step2-items** — host `<name> podinfo`, no interface, proxy `<name>`.
+   Master item *HTTP agent* on `http://podinfo.podinfo.svc:9898/metrics`,
+   every 30 s, history *Do not store*. Dependent items, *Prometheus
+   pattern* (+ *Change per second* on counters): started, requests/s,
+   5xx/s (`{status=~"5.."}`, `sum`), the histogram's `_sum` and `_count`;
+   a calculated mean latency; if time, the share under 0.5 s. Traps: a
+   pattern that matches nothing is an error, not 0; master down = every
+   item unsupported, no problem raised.
+3. **step3-lld** — two dependent discovery rules, *Prometheus to JSON*:
+   requests per `{#PATH}`/`{#STATUS}` from
+   `http_request_duration_seconds_count` (`http_requests_total` has no
+   `path`), new items when a new route is hit; the latency buckets
+   `{#LE}` from **one** series (`{path="metrics"}`: every series repeats
+   the bounds) and a calculated **p95**,
+   `bucket_percentile(//podinfo.bucket[*],5m,95)` — 1.7 s, against a 0.09 s
+   mean. Question: which label must never be a discovery key.
+4. **step4-template** — `<name> podinfo by HTTP` in template group
+   `<name>`, macro `{$PODINFO.URL}`; items *Copy*-ed to it, the two rules
+   recreated (rules have no *Copy*), then linked: the host's items with
+   the same keys are **adopted**, history kept. `{$PODINFO.URL}` on the
+   host pointed at the pod's IP, then back. **Two replicas** through the
+   Service: `started` flips, the rates are wrong and nothing is red; back
+   to one. From kube-state-metrics, what the cluster state template does
+   not read: `kube_deployment_status_condition{condition="Progressing",
+   status="false"}`, *rollout stuck*; if time, a bad image makes it 1.
+5. **step5-export** — the template into `~/m3/templates/podinfo.yaml`, the
+   host into `~/m3/hosts/`, commit, tag `lab3`; the `uuid`s are
+   server-wide and required by a template import: the solution has
+   `${UUID:<seed>}`, rendered per trainee by `lab0/render`. Questions: who owns the file, and how
+   it reaches the server (UI, API, `community.zabbix`). Importing it with
+   `community.zabbix` is not part of the lab **(to decide: whether lab0
+   installs the collection)**.
+
+**End state** (start of lab 4): podinfo, one replica on the worker, under
+load in `podinfo`; template `<name> podinfo by HTTP` (step 2 items, two
+discovery rules, p95, rollout stuck) linked to host `<name> podinfo`;
+`~/m3` tagged `lab3`.
 
 ## Lab 4 — Alert, dashboard, incident (session 4)
 
@@ -491,7 +502,7 @@ cluster with Linkerd and Bookinfo at ~3 GiB, this one runs less:
 
 | What | Per trainee | 3 trainees (+ the trainer's demo) |
 | --- | --- | --- |
-| `mon`: 2 kind nodes, proxy, 2 agents, kube-state-metrics, podinfo × 2, load pod | ~1.5 GiB | ~4.5 GiB (~6 GiB) |
+| `mon`: 2 kind nodes, proxy, 2 agents, kube-state-metrics, podinfo, load pod | ~1.5 GiB | ~4.5 GiB (~6 GiB) |
 | Zabbix server, web, PostgreSQL (shared) | | ~0.5 GiB measured idle; to measure with 4 proxies and their LLD |
 
 The server side is the unknown: `ZBX_CACHESIZE=256M` and 10 pollers are set
@@ -506,15 +517,16 @@ the step files only as much as the room needs.
 module3/
   README.md                this file
   versions.env             pinned versions                                written
-  Makefile                 catch-up-lab1 (written), -lab2, -lab3
+  Makefile                 catch-up-lab1, -lab2, -lab3 (written)
   lab0/                    Makefile: chart, pull, load, credentials, check,
                            pull-consoles; zapi (the API as the trainee),
-                           import (host exports, see Conventions), render,
-                           user-env.jq                                    written
+                           import (host and template exports, see
+                           Conventions), render, user-env.jq              written
   lab1/                    README.md, kind.yaml, step1…5/ (step2-chart/values.yaml,
                            step4-nodes/cut.yaml), solution/               written
   lab2/                    README.md, step1…6/ (step4-churn/), solution/
-  lab3/                    README.md, load.yaml, step1…5/, solution/
+  lab3/                    README.md, load.yaml, step1…5/ (step1-podinfo/values.yaml),
+                           solution/ (templates/: ${UUID:…})              written
   lab4/                    README.md, break (control | workload), reset,
                            step1…5/, solution/
 ../shared-cluster/bin/zabbix   users [--delete] (written, tested locally)
