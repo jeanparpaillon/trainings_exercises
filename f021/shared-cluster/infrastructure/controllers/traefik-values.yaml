@@ -1,0 +1,94 @@
+# Helm values of the `traefik` release (traefik.yaml). The whole set: Flux
+# installs with these and nothing else.
+#
+# Traefik is the only HTTP layer on the server: it terminates TLS and gets the
+# Let's Encrypt certificates itself. Nothing runs in front of it; the docker
+# port mapping of the kind node sends 0.0.0.0:80/443 straight to the NodePorts
+# 30080/30443 below (see README, "The server").
+ingressClass:
+  isDefaultClass: true
+
+service:
+  type: NodePort
+  spec:
+    type: NodePort
+    # Docker's DNAT keeps the client address up to the node; with the default
+    # `Cluster` policy kube-proxy would then SNAT it away. Single node, so
+    # `Local` costs nothing.
+    externalTrafficPolicy: Local
+
+providers:
+  kubernetesIngress:
+    publishedService:
+      enabled: false
+  # Gateway API, see `gateway` below.
+  kubernetesGateway:
+    enabled: true
+
+ports:
+  web:
+    nodePort: 30080
+    # Routers that name no entrypoint attach to `web` only. The trainees'
+    # *.nip.io Ingresses therefore stay HTTP-only, and Traefik never asks
+    # Let's Encrypt for a nip.io name (the domain is shared by the whole
+    # internet, so its rate limit is always exhausted).
+    asDefault: true
+    # Only pods may set X-Forwarded-*; everything else reaches Traefik with
+    # its own address as the peer.
+    forwardedHeaders:
+      trustedIPs: ["10.244.0.0/16"]
+  websecure:
+    nodePort: 30443
+    http:
+      tls:
+        enabled: true
+        # Every router on websecure gets a certificate from `le` for its Host().
+        # Only Ingresses that opt in with router.entrypoints=websecure are on it.
+        certResolver: le
+    transport:
+      respondingTimeouts:
+        # Traefik v3 defaults to 60s, which cuts large image pushes to the
+        # registry (the former nginx front had proxy_read_timeout 900s there).
+        readTimeout: 0
+
+certificatesResolvers:
+  le:
+    acme:
+      email: jean.parpaillon@gmail.com
+      storage: /data/acme.json
+      httpChallenge:
+        entryPoint: web
+
+# acme.json must survive pod restarts, or every restart re-orders all the
+# certificates. File storage also limits Traefik to one replica: fine on a
+# single-node cluster.
+persistence:
+  enabled: true
+  storageClass: standard
+  size: 128Mi
+
+# Gateway API (module 2 lab "expose and reach your application"): the same
+# HTTP entrypoint serves trainees' HTTPRoutes next to their Ingresses.
+# The chart creates GatewayClass `traefik` and Gateway `traefik/traefik-gateway`
+# with one HTTP listener on `web` (port 8000 = the entrypoint's container
+# port, as Traefik requires) accepting routes from every namespace. An
+# trainee's route:
+#
+#   parentRefs: [{ name: traefik-gateway, namespace: traefik }]
+#   hostnames:  ["<app>.<ns>.195.35.2.222.nip.io"]
+#
+# No HTTPS listener: like the nip.io Ingresses, routes stay HTTP only and
+# never reach the `le` resolver.
+gateway:
+  enabled: true
+  name: traefik-gateway
+  listeners:
+    web:
+      port: 8000
+      protocol: HTTP
+      namespacePolicy:
+        from: All
+
+gatewayClass:
+  enabled: true
+  name: traefik

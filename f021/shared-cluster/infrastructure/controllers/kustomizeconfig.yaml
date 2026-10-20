@@ -1,0 +1,8 @@
+# Lets kustomize rewrite HelmRelease valuesFrom with the hashed ConfigMap
+# names (fluxcd.io/flux/guides/helmreleases/#refer-to-values-in-configmaps-generated-with-kustomize).
+nameReference:
+  - kind: ConfigMap
+    version: v1
+    fieldSpecs:
+      - path: spec/valuesFrom/name
+        kind: HelmRelease

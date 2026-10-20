@@ -1,0 +1,25 @@
+# The VPA CRD does not extend the built-in roles: aggregated here so that
+# `admin` in their namespace lets trainees create VPAs (module 3 lab,
+# "right-size with VPA"), and `view` lets them read everyone's.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: trainee-vpa-edit
+  labels:
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+    rbac.authorization.k8s.io/aggregate-to-edit: "true"
+rules:
+  - apiGroups: [autoscaling.k8s.io]
+    resources: [verticalpodautoscalers, verticalpodautoscalercheckpoints]
+    verbs: [get, list, watch, create, update, patch, delete, deletecollection]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: trainee-vpa-view
+  labels:
+    rbac.authorization.k8s.io/aggregate-to-view: "true"
+rules:
+  - apiGroups: [autoscaling.k8s.io]
+    resources: [verticalpodautoscalers, verticalpodautoscalercheckpoints]
+    verbs: [get, list, watch]

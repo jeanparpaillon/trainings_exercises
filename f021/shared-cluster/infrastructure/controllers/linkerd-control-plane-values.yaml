@@ -1,0 +1,8 @@
+# Helm values of `linkerd-control-plane` (linkerd.yaml). identityTrustAnchorsPEM
+# is not here: it comes from Secret flux-system/linkerd-trust-anchor.
+identity:
+  issuer:
+    # Read the issuer certificate and key from Secret linkerd-identity-issuer
+    # (tls.crt, tls.key, ca.crt) instead of rendering them from values: the key
+    # then never goes through Helm's release history.
+    scheme: kubernetes.io/tls

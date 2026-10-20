@@ -1,0 +1,10 @@
+# Helm values of `linkerd-viz` (linkerd.yaml).
+#
+# The dashboard is served at https://linkerd.srv2052563.hstgr.cloud/ behind a
+# basic-auth password (infrastructure/configs/linkerd-dashboard.yaml).
+# `linkerd viz dashboard` cannot serve trainees: it port-forwards to
+# localhost, which from a web console is the console pod.
+dashboard:
+  # The dashboard rejects any Host header it was not told about
+  # (DNS-rebinding guard).
+  enforcedHostRegexp: '^linkerd\.srv2052563\.hstgr\.cloud$'

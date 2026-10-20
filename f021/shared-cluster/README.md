@@ -1,30 +1,50 @@
 # The shared cluster
 
-The cluster the room works on during the session. Attendees drive it from
-their own machine with a local `kubectl`; nothing is installed for them
-beyond that.
+The cluster the room works on during the session: one single-node kind
+cluster, `training`, on one server (`srv2052563.hstgr.cloud`), the same
+baseline as the f021bis cluster ([`../../f021bis/shared-cluster/`](../../f021bis/shared-cluster/)).
+Everything it runs is in this directory, and applied by Flux from this repo.
+
+Trainees are `user1`, `user2`… (`TRAINEES` in [`fleet.env`](fleet.env)):
+each person is told which one they are. No file here carries a person's name.
 
 | | |
 | --- | --- |
+| Web console | `https://srv2052563.hstgr.cloud/<you>/`, login `<you>`, password from the trainer |
 | API server | `https://srv2052563.hstgr.cloud:6443` |
 | Kubernetes | 1.37 |
-| Public URL | `https://srv2052563.hstgr.cloud/` (valid Let's Encrypt certificate): web consoles |
-| Lab applications | `http://<app>.<namespace>.195.35.2.222.nip.io/` (plain HTTP) |
+| Your namespace | `<you>` (e.g. `user3`): you are `admin` in it, and only in it; you may label it |
+| Lab applications | `http://<app>.<you>.195.35.2.222.nip.io/` (plain HTTP) |
 | Ingress controller | Traefik, IngressClass `traefik` (the default one) |
-| Storage | `local-path` (`StorageClass` `standard`) |
-| Your namespace | your first name, lower case — you are `admin` in it, and only in it |
-| Web console | `https://srv2052563.hstgr.cloud/<namespace>/` (password from the trainer) |
+| Gateway API | GatewayClass `traefik`, shared Gateway `traefik/traefik-gateway` (HTTP) |
+| Storage | `local-path` (`StorageClass` `standard`), RWO only, bound to the node |
+| Quota | `trainee` in your namespace: 1 CPU / 2 GiB requested, 4 GiB memory limits, 30 pods, 5 PVCs / 10 GiB; default requests from LimitRange `trainee` |
+| Metrics | `kubectl top`, VPA (recommendations only), custom metrics for HPA (`requests_per_second`, Linkerd-meshed pods) |
+| Monitoring | Grafana at `https://grafana.srv2052563.hstgr.cloud/` (your console login); Prometheus picks up your ServiceMonitors, PodMonitors and PrometheusRules |
+| Headlamp | `https://srv2052563.hstgr.cloud/headlamp/`, token: `kubectl create token headlamp --duration=168h` |
 
 ## Connect
 
-The trainer gives you a kubeconfig. Then:
+**From your web console**: nothing to set up. `kubectl`, `helm`, `flux`,
+`git`, `jq` and `curl` are installed, the context `training` points at your
+namespace, and `$NS` is set:
 
 ```sh
-export KUBECONFIG=~/Downloads/f021-<you>.kubeconfig    # or merge it into ~/.kube/config
-export NS=<you>                                        # e.g. NS=jean
-kubectl config set-context --current --namespace="$NS"
-kubectl auth can-i create deployments -n "$NS"         # yes
-kubectl version                                        # client within one minor of 1.37
+kubectl auth can-i create deployments      # yes
+kubectl auth can-i list nodes              # yes (read only)
+kubectl auth can-i create namespaces       # no
+```
+
+Your home directory is kept across console restarts.
+
+**From your own machine**, with the kubeconfig the trainer gives you
+(a client certificate, valid for the week):
+
+```sh
+export KUBECONFIG=~/Downloads/<you>.kubeconfig    # or merge it into ~/.kube/config
+export NS=<you>
+kubectl auth can-i create deployments -n "$NS"    # yes
+kubectl version                                   # client within one minor of 1.37
 ```
 
 Use a `kubectl` from 1.36 to 1.38: older clients work for these labs but warn
@@ -41,7 +61,7 @@ Each Ingress gets its own host name, with your namespace in it:
 http://<app>.<namespace>.195.35.2.222.nip.io/<path>
 ```
 
-e.g. `http://bookinfo.jean.195.35.2.222.nip.io/productpage`. nip.io is
+e.g. `http://bookinfo.user3.195.35.2.222.nip.io/productpage`. nip.io is
 wildcard DNS: `<anything>.195.35.2.222.nip.io` resolves to `195.35.2.222`,
 the server, where Traefik picks your Ingress by host name. The same URL works
 with `curl` from your web console and in the browser on your machine. Your
@@ -57,115 +77,257 @@ spec:
           - path: /...
 ```
 
-Lab 1 step 1 generates this Ingress for Bookinfo; see
-[`../module1/lab1/step1-deploy/`](../module1/lab1/step1-deploy/).
-
 Things to know:
 
 - **Always put your namespace in the host name.** Two Ingresses with the
   same host and path fight over the same rule.
 - **HTTP only.** Only the trainer's host names (`srv2052563.hstgr.cloud`,
-  `chat.`, `registry.`) get a certificate; `*.nip.io` names are served on
-  port 80 alone.
+  `grafana.`, `registry.`, `linkerd.`) get a certificate; `*.nip.io` names
+  are served on port 80 alone.
 - **Not `127.0.0.1.nip.io`** as on kind: from your machine that is your
   machine, and from the web console it is the console pod itself.
 - `https://srv2052563.hstgr.cloud/<namespace>/` is your web console. Path
   prefixes under that host are still possible with the `strip-ns-app`
-  middleware (see [`traefik-strip-prefix.yaml`](traefik-strip-prefix.yaml)),
+  middleware (see [`traefik-strip-prefix.yaml`](infrastructure/configs/traefik-strip-prefix.yaml)),
   but the application must then use relative links; prefer a host name.
 - No Ingress, or something that is not HTTP? `kubectl -n "$NS" port-forward
   svc/<name> <port>` always works from your machine.
+- **No NodePort, no LoadBalancer**: the quota forbids both. Nothing outside
+  the server could reach them anyway.
 
-## Trainer — preparing the cluster
+### Gateway API
 
-Each attendee gets a namespace, a `RoleBinding` to `ClusterRole/admin` in it,
-and a console. Then, once for the room:
+The same host names work with an HTTPRoute instead of an Ingress (module 2
+network lab), attached to the shared Gateway:
 
-```sh
-kubectl apply -f shared-cluster/traefik-strip-prefix.yaml
-kubectl apply -f shared-cluster/trainee-read.yaml
-kubectl apply -f shared-cluster/gatewayapi-rbac.yaml
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: web
+spec:
+  parentRefs:
+    - { name: traefik-gateway, namespace: traefik }
+  hostnames: ["<app>.<namespace>.195.35.2.222.nip.io"]
+  rules:
+    - backendRefs:
+        - { name: web, port: 80 }
 ```
 
-[`gatewayapi-rbac.yaml`](gatewayapi-rbac.yaml) adds the Gateway API types
-(HTTPRoute, GRPCRoute, ReferenceGrant, Gateway…) to the built-in `admin`,
-`edit` and `view` roles by aggregation, which the Gateway API CRDs do not do
-themselves. Needed from module 1 lab 2 step 5 on.
+`kubectl -n "$NS" get httproute web -o yaml`: `status.parents[].conditions`
+says whether the Gateway accepted it. Same rules as for Ingresses: your
+namespace in the host, HTTP only.
 
-[`trainee-read.yaml`](trainee-read.yaml) lets attendees read the whole
-cluster (every namespace, nodes, CRDs, APIServices…, never Secrets) from
-kubectl, their console and Headlamp, which is what Headlamp's overview and
-`linkerd check` / `linkerd viz check` need; writes stay limited to their own
-namespace. A new attendee needs a Headlamp subject added there.
+### With a default-deny NetworkPolicy
 
-**Currently applied on top of all this:**
-[`trainee-cluster-admin.yaml`](trainee-cluster-admin.yaml) makes every attendee
-`cluster-admin` (certificate, console and Headlamp). It overrides the scoped
-grants above; `kubectl delete -f shared-cluster/trainee-cluster-admin.yaml`
-falls back to them.
+Traefik reaches your pods from the `traefik` namespace. Once your namespace
+denies ingress by default (module 2 network lab, module 5), allow it back:
 
-After `linkerd viz install`, also:
-
-```sh
-kubectl apply -f shared-cluster/linkerd-viz-rbac.yaml
+```yaml
+ingress:
+  - from:
+      - namespaceSelector:
+          matchLabels: { kubernetes.io/metadata.name: traefik }
 ```
 
-[`linkerd-viz-rbac.yaml`](linkerd-viz-rbac.yaml) lets attendees port-forward
-into `linkerd-viz` (what `linkerd viz check | stat | top | edges` do) and
-`linkerd viz tap` their own namespace, not the others'.
+and DNS (`kube-system`, UDP and TCP 53) for egress.
 
-The dashboard is at `https://linkerd.srv2052563.hstgr.cloud/` (user
-`trainee`, password from the trainer); see
-[`linkerd-dashboard.yaml`](linkerd-dashboard.yaml) for the install flag and
-the password Secret it needs.
+## What the labs need, and what is there
 
-Monitoring: kube-prometheus-stack in `monitoring`, installed with
-[`kube-prometheus-stack-values.yaml`](kube-prometheus-stack-values.yaml)
-(the commands are in its header). Grafana is at
-`https://grafana.srv2052563.hstgr.cloud/`: attendees log in with their console
-name and password (`Editor`), created from `/root/users/consoles.txt` by
-[`grafana-users.sh`](grafana-users.sh), run on the server
-(`ssh $S 'bash -s' < shared-cluster/grafana-users.sh`, again after adding an
-attendee); the trainer is `admin`, password in Secret `monitoring/grafana-admin`; Prometheus is at
-`http://kube-prometheus-stack-prometheus.monitoring.svc:9090` in the cluster.
-Prometheus picks up every ServiceMonitor, PodMonitor and PrometheusRule in any
-namespace (no `release` label needed), Grafana every ConfigMap labelled
-`grafana_dashboard: "1"`, and attendees get the `monitoring.coreos.com` types
-through `admin`/`edit`/`view`. etcd, scheduler, controller-manager and
-kube-proxy are not scraped: kind binds their metrics to 127.0.0.1.
+Per lab of the eight-module program (see [`../README.md`](../README.md)).
 
-Then, for the Linkerd metrics (`request_total`, `response_latency_ms`… with
-`namespace` / `deployment` labels, for Grafana, PrometheusRules and Flagger):
+| Module · lab | Needs | Status |
+| --- | --- | --- |
+| all | Traefik, IngressClass `traefik`, nip.io host names | installed |
+| all | namespace `admin` only (`TRAINEES_CLUSTER_ADMIN=false`), quota `trainee` | installed (tenants) |
+| 1 · Helm, 6 · CI/CD | GHCR reachable from the node, public images and charts (or an `imagePullSecret` per namespace) | nothing to install; **check** pulls from `ghcr.io` |
+| 2 · storage, StatefulSet | StorageClass `standard`, PVCs in the quota | installed |
+| 2 · network | Gateway `traefik/traefik-gateway`, HTTPRoute rights | installed (Traefik values, `gatewayapi-rbac.yaml`) |
+| 2 · network, 5 · Pod Security / NetworkPolicy | a CNI that enforces NetworkPolicy | kindnet enforces it since kind 0.24: **check** with a default-deny in a test namespace |
+| 3 · autoscale | metrics-server, VPA recommender, prometheus-adapter (`requests_per_second`) | installed |
+| 3 · autoscale, step "HPA on request rate" | Bookinfo meshed (Linkerd proxies export `request_total`) | Linkerd installed; the step injects the namespace |
+| 3 · harden, step "spread and budgets" | several nodes to drain | **single node**: trainer demo on kind |
+| 4 · monitoring | kube-prometheus-stack, Grafana logins, ServiceMonitor / PrometheusRule rights | installed |
+| 4 · logging | a log stack (Loki + an agent) | **not installed**: `kubectl logs` only, or add it here |
+| 4 · troubleshooting | namespace-level faults only; the quota scenario needs the trainer | nothing to install |
+| 5 · least privilege | starting from `trainee` rights | installed |
+| 5 · Pod Security | trainees label their own namespace | installed (`trainee-<name>-namespace-labels`) |
+| 5 · secrets | SOPS (client side + Flux decryption); ESO / Vault optional | SOPS needs nothing in-cluster beyond Flux; ESO, Vault **not installed** |
+| 5 · supply chain (theory) | Kyverno for verify-at-admission | **not installed**: demo only |
+| 6 · GitOps | Flux, one tenant per trainee on `$GITHUB_OWNER/f021-<name>` | installed, commented out: enabled per trainee during the lab |
+| 6 · GitOps, step "canary" | Flagger + Linkerd or Traefik metrics | **not installed**: demo, or add Flagger here |
+| 7 · tenants demo | cluster-admin | trainer |
+| 7 · backup demo | Velero + object storage | **not installed**: trainer demo on kind (`f021bis/module1/lab4`) |
+| 8 · game day | the module 4 faults, the module 6 pipeline | nothing to install |
 
-```sh
-kubectl apply --validate=false -f shared-cluster/linkerd-scrape.yaml
+No longer needed by any lab: Istio, Chaos Mesh, KEDA, Pyroscope, OpenCost.
+Linkerd stays for the request-rate HPA and as a deep dive.
+
+---
+
+## Trainer — layout
+
+```
+kind.yaml                  the cluster (make create): API and 80/443 on the server
+Makefile                   everything below, from the trainer's machine
+fleet.env                  HOST, TRAINEES, GITHUB_OWNER, CONSOLE_IMAGE, FLUX_VERSION, RBAC level
+console/                   console image: ttyd, kubectl, helm, flux (make image)
+clusters/hstgr/            Flux entry point (bootstrap --path)
+  flux-system/             multi-tenancy lockdown patches (+ bootstrap output)
+  infrastructure.yaml      gateway-api -> infra-controllers -> infra-configs
+  room.yaml                -> room
+  tenants.yaml             -> tenants
+infrastructure/
+  controllers/             HelmReleases + values: Traefik (+ Gateway), Linkerd
+                           (crds, control plane, viz), kube-prometheus-stack,
+                           Headlamp, metrics-server, VPA, prometheus-adapter
+  configs/                 Traefik middlewares and HTTPS redirect, Linkerd
+                           dashboard Ingress, Linkerd scrape configs
+    rbac/                  trainee RBAC, `trainee` and `admin` levels
+room/
+  consoles/                web consoles, one per trainee   (generated)
+  registry/                image registry (optional, GHCR is the default)
+tenants/                   one tenant per trainee          (generated)
+templates/                 what bin/render generates from
+bin/                       render, gen-secrets, grafana-users, kubeconfigs
+secrets/, secrets.yaml     generated values, git-ignored   (bin/gen-secrets)
+kubeconfig                 cluster-admin, git-ignored      (make kubeconfig)
 ```
 
-[`linkerd-scrape.yaml`](linkerd-scrape.yaml) holds Linkerd's own scrape jobs as
-ScrapeConfigs. The linkerd-viz Prometheus stays, for `linkerd viz` and its
-dashboard. (`--validate=false`: the OpenAPI download often times out over this
-link; the server still validates.)
+Generated files are committed: Flux reads them from git, and with generic
+trainee names they hold nothing personal. Edit the templates, then
+`make render`.
 
-Edge setup (Traefik, TLS, port mapping) is described in
-[Trainer — the edge](#trainer--the-edge) below.
+Order of application, each layer waiting for the previous one to be healthy:
 
-Check it end to end with your own namespace:
+```
+flux-system ─► gateway-api ─► infra-controllers ─► infra-configs ─┬─► room
+                                                                   └─► tenants
+```
+
+## Trainer — building it
+
+Needs, on the trainer's machine: `ssh root@srv2052563.hstgr.cloud` working,
+`kubectl`, the `flux` CLI (same version as `FLUX_VERSION`), `gh` logged in,
+`openssl`, `ssh-keygen`, `htpasswd` (apache2-utils). On the server: Docker,
+kind. Only one of the f021 and f021bis clusters can run on the server at a
+time (same ports, see [`kind.yaml`](kind.yaml)).
 
 ```sh
-NS=<trainer-namespace>
-sed "s/CHANGEME/$NS/g" module1/lab1/step1-deploy/ingress.yaml.tmpl \
-  > module1/lab1/step1-deploy/ingress.yaml
-kubectl -n "$NS" apply -k module1/lab1/step1-deploy
+make create        # kind cluster `training` on the server
+make kubeconfig    # ./kubeconfig, cluster-admin
+make image         # console image, built on the server, loaded into kind
+make secrets       # secrets.yaml from secrets/ (generated if missing), applied
+GITHUB_TOKEN=$(gh auth token) make bootstrap
+make watch         # every Kustomization Ready: several minutes (image pulls)
+make grafana-users # Grafana logins = console passwords
+make kubeconfigs   # secrets/kubeconfigs/<name>.kubeconfig, one per trainee
+make check         # consoles answer 401 (basic auth), Grafana 200
+```
+
+`make secrets` must run before `make bootstrap`: the Linkerd and Grafana
+releases need their Secrets on first install. `make bootstrap` installs the
+controllers with the lockdown patches, **commits** `gotk-components.yaml` and
+`gotk-sync.yaml` under `clusters/hstgr/flux-system/` on `main` of this repo,
+and registers a read-only deploy key on it.
+
+Console passwords are in `secrets/passwords.txt` (`<name> <password> <url>`,
+the format of the f021bis server's `/root/users/consoles.txt`). **Back up
+`secrets/`**: it also holds the Linkerd trust anchor and the module 6 deploy
+keys registered on GitHub; rebuilding with the same `secrets/` gives back
+the same passwords and keys.
+
+Check end to end from a trainee namespace (`user1`, from its console or with
+its kubeconfig):
+
+```sh
+sed "s/CHANGEME/user1/g" ../module1/lab1/step1-deploy/ingress.yaml.tmpl \
+  > ../module1/lab1/step1-deploy/ingress.yaml
+kubectl -n user1 apply -k ../module1/lab1/step1-deploy
 curl -s -o /dev/null -w '%{http_code}\n' \
-  "http://bookinfo.$NS.195.35.2.222.nip.io/productpage"         # 200
+  "http://bookinfo.user1.195.35.2.222.nip.io/productpage"         # 200
 ```
 
-## Trainer — the edge
+and `linkerd check`, `linkerd viz check` if Linkerd matters for the session.
+
+## Trainer — day to day
+
+- **More or fewer trainees**: edit `TRAINEES` in `fleet.env`, `make render
+  secrets`, commit, push; then `make grafana-users kubeconfigs`. Flux does
+  not delete a namespace or a console home dropped from the list (prune
+  disabled on them): delete those by hand.
+- **Console image change**: edit `console/`, bump `CONSOLE_IMAGE` in
+  `fleet.env`, `make image render`, commit, push.
+- **Module 6, a trainee's Flux tenant**: create `$GITHUB_OWNER/f021-<name>`
+  from the sample app, with the trainee as collaborator; `make deploy-keys
+  NAMES=<name>`; uncomment `<name>-flux.yaml` in `tenants/kustomization.yaml`,
+  commit, push.
+- **Change a chart's values**: edit the values file in
+  `infrastructure/controllers/`, commit, push: the ConfigMap name changes
+  with its content, which upgrades the release. `flux reconcile kustomization
+  infra-controllers --with-source` to not wait.
+- **Linkerd issuer** expires one year after it was generated:
+  `bin/gen-secrets --renew-issuer`, `make secrets`, then
+  `kubectl -n linkerd rollout restart deploy/linkerd-identity`.
+- **A new HTTPS host**: an Ingress with
+  `traefik.ingress.kubernetes.io/router.entrypoints: websecure`, *and* the host
+  in [`infrastructure/configs/traefik-https.yaml`](infrastructure/configs/traefik-https.yaml).
+- **Starting over**: `make delete`, then the build above. Every PVC goes with
+  the cluster (consoles' homes, Prometheus, Grafana users, acme.json).
+
+## Trainer — how it is put together
+
+### Multi-tenancy lockdown
+
+The Flux controllers run with `--no-cross-namespace-refs`,
+`--default-service-account=default` and `--no-remote-bases`
+([clusters/hstgr/flux-system/kustomization.yaml](clusters/hstgr/flux-system/kustomization.yaml)).
+So every platform Kustomization says `serviceAccountName: kustomize-controller`,
+every platform HelmRelease `serviceAccountName: helm-controller`, and they all
+live in `flux-system` next to their sources. A trainee's Kustomization runs as
+their `flux` ServiceAccount, with `edit` in their namespace only.
+
+### RBAC levels
+
+| Level | What trainees get | Where |
+| --- | --- | --- |
+| `trainee` | `admin` in their namespace, labels on it, the `trainee` quota; read everything else, Secrets excepted; Gateway API, `linkerd viz tap`, mariadb-operator, VPA and custom-metrics types | `infrastructure/configs/rbac/` (groups), `tenants/<name>.yaml` (per trainee) |
+| `admin` | the above + `cluster-admin` | `rbac/trainees-cluster-admin.yaml`, `TRAINEES_CLUSTER_ADMIN=true` in `fleet.env` |
+
+`trainee` is the setting, and what the labs assume: every lab runs in the
+trainee's namespace, and what needs more (draining a node, creating tenants,
+Velero) is a trainer demo. `admin` lets trainees change anything, Flux
+included: during a former session two of them ran `flux bootstrap` on the
+cluster, one repointing `flux-system` at their own repo. Use it only to
+unblock a session.
+
+Each trainee has three identities, all covered: their kubectl certificate
+(`CN=<name>`, `O=trainees`, `make kubeconfigs`), their console's
+ServiceAccount `consoles/console-<name>`, and their Headlamp ServiceAccount
+`<name>/headlamp`.
+
+### Secrets
+
+Nothing secret is in git. [`bin/gen-secrets`](bin/gen-secrets) writes
+`secrets.yaml` (git-ignored) from the values kept in `secrets/` (git-ignored),
+generating whatever is missing; `make secrets` applies it. Its header lists
+every Secret.
+
+### Consoles
+
+ttyd serving `bash -l`, one Deployment per trainee in `consoles`, behind
+basic auth, home on a PVC. The image ([`console/`](console/)) is the f021bis
+console without Docker, kind, etcd and ansible: built on the server and loaded
+into the kind node by `make image`, never pulled from a registry, so a new
+tag (`CONSOLE_IMAGE`) is what rolls the consoles. Its `console-init` writes
+the `training` kubectl context from the pod's ServiceAccount token.
+
+### The edge
 
 Traefik is the only HTTP layer on the server: it terminates TLS, gets the
 Let's Encrypt certificates (ACME HTTP-01) and routes on the Host header.
-Nothing runs in front of it. The kind node's docker port mapping is the whole
-"edge":
+Nothing runs in front of it. The kind node's port mapping ([`kind.yaml`](kind.yaml))
+is the whole "edge":
 
 ```
 client ─► 195.35.2.222:80/443        docker DNAT on the host (port mapping of the kind node)
@@ -179,190 +341,52 @@ Local` stops kube-proxy from SNATing it away).
 
 | File | What it is |
 | --- | --- |
-| [`traefik-values.yaml`](traefik-values.yaml) | the full Helm values of the `traefik` release: ACME resolver `le`, `web` as default entrypoint, `acme.json` on a PVC |
-| [`traefik-https.yaml`](traefik-https.yaml) | HTTP→HTTPS redirect for the hosts that have a certificate |
-| [`traefik-strip-prefix.yaml`](traefik-strip-prefix.yaml) | path-prefix middleware for attendees |
+| [`traefik-values.yaml`](infrastructure/controllers/traefik-values.yaml) | the full Helm values of the `traefik` release: ACME resolver `le`, `web` as default entrypoint, `acme.json` on a PVC, Gateway API provider and the shared Gateway |
+| [`traefik-https.yaml`](infrastructure/configs/traefik-https.yaml) | HTTP→HTTPS redirect for the hosts that have a certificate |
+| [`traefik-strip-prefix.yaml`](infrastructure/configs/traefik-strip-prefix.yaml) | path-prefix middleware for trainees |
 
 How a route ends up on HTTP or HTTPS:
 
 - **No annotation → HTTP only.** `web` is the default entrypoint, so routers
-  that name none attach to port 80 alone. That covers every attendee Ingress
-  (`*.nip.io`), and is what keeps Traefik from asking Let's Encrypt for nip.io
-  names, which share one rate limit with the whole internet.
+  that name none attach to port 80 alone. That covers every trainee Ingress
+  and HTTPRoute (`*.nip.io`), and is what keeps Traefik from asking Let's
+  Encrypt for nip.io names, which share one rate limit with the whole
+  internet. Never make `websecure` a default, nor put the certResolver on a
+  router that would catch `*.nip.io` names.
 - **`traefik.ingress.kubernetes.io/router.entrypoints: websecure` → HTTPS.** TLS
   and the `le` resolver are set on the `websecure` entrypoint itself, so that one
   annotation is enough; Traefik orders the certificate for the Ingress host on
   first sight. The host must also be added to `traefik-https.yaml`, or plain
-  HTTP on it gets a 404 instead of a redirect.
+  HTTP on it gets a 404 instead of a redirect. That annotation is on the
+  consoles, Headlamp, Grafana, the registry and the Linkerd dashboard.
+- **`websecure` has `readTimeout: 0`**, for large registry pushes (Traefik v3
+  defaults to 60 s).
 
-That annotation goes on the `consoles/*`, `default/hello`,
-`headlamp/headlamp`, `registry/registry` and `rocketchat` Ingresses. The
-Rocket.Chat one belongs to its Helm release: set it with
-`--set-string 'ingress.annotations.traefik\.ingress\.kubernetes\.io/router\.entrypoints=websecure'`,
-or the next `helm upgrade` drops it.
+**IPv4 only.** The host names have AAAA records, but the cluster is
+single-stack IPv4: kube-proxy programs no IPv6 NodePort, so the port mapping
+is bound on `0.0.0.0` only and IPv6 connections to 80/443 are refused.
+Browsers fall back to IPv4, and so does Let's Encrypt. Serving IPv6 needs a
+dual-stack kind cluster (`networking.ipFamily: dual` in `kind.yaml`), i.e. a
+recreate.
 
-**IPv4 only.** The host names have AAAA records (`2a02:4780:28:966e::1`), but
-the cluster is single-stack IPv4: kube-proxy programs no IPv6 NodePort, so the
-port mapping is bound on `0.0.0.0` only and IPv6 connections to 80/443 are
-refused. Browsers fall back to IPv4, and so does Let's Encrypt (it retries
-over IPv4 when the IPv6 connection fails, not when it gets an HTTP error).
-Serving IPv6 needs a dual-stack kind cluster, i.e. a rebuild.
+### Monitoring
 
-### Migrating from the host nginx
+kube-prometheus-stack in `monitoring`. Grafana is at
+`https://grafana.srv2052563.hstgr.cloud/`: trainees log in with their console
+name and password (`Editor`, `make grafana-users`); the trainer is `admin`,
+password in Secret `monitoring/grafana-admin`. Prometheus picks up every
+ServiceMonitor, PodMonitor and PrometheusRule in any namespace (no `release`
+label needed), Grafana every ConfigMap labelled `grafana_dashboard: "1"`, and
+trainees get the `monitoring.coreos.com` types through `admin`/`edit`/`view`.
+etcd, scheduler, controller-manager and kube-proxy are not scraped: kind binds
+their metrics to 127.0.0.1. Linkerd's metrics are scraped into it too
+([`linkerd-scrape.yaml`](infrastructure/configs/linkerd-scrape.yaml)), for
+Grafana, PrometheusRules, prometheus-adapter and Flagger.
 
-Until this is done, the server runs the previous layout: nginx with
-certbot-managed vhosts in `/etc/nginx/sites-enabled/` (`k8s`, `k8s-chat`,
-`k8s-registry`, `k8s-labs`) terminating TLS and passing plain HTTP to
-`127.0.0.1:8080`, which the kind node publishes for NodePort 30080.
+### Not yet run as a whole
 
-kind port mappings cannot be changed on a running cluster, and recreating it
-loses everything in it (consoles' homes, Rocket.Chat's MongoDB, the registry's
-images: the `local-path` volumes live in the node's docker volume, and the
-consoles setup is not in this repo). Instead, the mapping is edited in the
-node container's `hostconfig.json` while dockerd is stopped, which ends up in
-the same state as a cluster created with the right `extraPortMappings`.
-
-Do it outside session hours: from step 2 the consoles are unreachable until
-step 4 is finished, and step 4 restarts the whole cluster (a few minutes).
-
-From your machine:
-
-```sh
-S=root@srv2052563.hstgr.cloud
-kubectl get ingress -A -o yaml > ingress-backup.yaml
-```
-
-**1. Backups** (on the server):
-
-```sh
-D=/var/lib/docker/containers/$(docker inspect -f '{{.Id}}' training-control-plane)
-cp "$D/hostconfig.json" /root/hostconfig.json.bak
-tar czf /root/nginx-letsencrypt.tgz /etc/nginx /etc/letsencrypt
-```
-
-**2. Traefik and routes** (from your machine):
-
-```sh
-scp shared-cluster/traefik-values.yaml $S:/root/
-ssh $S helm upgrade traefik traefik/traefik -n traefik --version 41.7.1 -f /root/traefik-values.yaml
-kubectl -n traefik rollout status deploy/traefik
-
-kubectl apply -f shared-cluster/traefik-https.yaml
-A=traefik.ingress.kubernetes.io/router.entrypoints=websecure
-kubectl -n consoles annotate ingress --all "$A"
-kubectl -n default  annotate ingress hello     "$A"
-kubectl -n headlamp annotate ingress headlamp  "$A"
-kubectl -n registry annotate ingress registry  "$A"
-ssh $S "helm upgrade rocketchat rocketchat/rocketchat -n rocketchat --version 7.0.2 --reuse-values \
-  --set-string 'ingress.annotations.traefik\.ingress\.kubernetes\.io/router\.entrypoints=websecure'"
-```
-
-The certificates may already be issued at this point: Let's Encrypt follows
-the old nginx's HTTP→HTTPS redirect, and nginx passes the challenge to
-Traefik's `web` entrypoint.
-
-**3. Stop nginx** (on the server). Disabled, not removed, for the rollback:
-
-```sh
-systemctl disable --now nginx
-```
-
-**4. Publish the NodePorts on 80/443** (on the server):
-
-```sh
-D=/var/lib/docker/containers/$(docker inspect -f '{{.Id}}' training-control-plane)
-systemctl stop docker.socket docker        # stops the kind node with it
-python3 - "$D/hostconfig.json" <<'EOF'
-import json, sys
-p = sys.argv[1]
-h = json.load(open(p))
-h["PortBindings"]["30080/tcp"] = [{"HostIp": "0.0.0.0", "HostPort": "80"}]
-h["PortBindings"]["30443/tcp"] = [{"HostIp": "0.0.0.0", "HostPort": "443"}]
-json.dump(h, open(p, "w"))
-EOF
-systemctl start docker
-docker start training-control-plane        # restart policy is on-failure: not started by dockerd
-docker port training-control-plane         # 30080 -> 0.0.0.0:80, 30443 -> 0.0.0.0:443, 6443
-docker inspect -f '{{.NetworkSettings.Networks.kind.IPAddress}}' training-control-plane   # still 172.18.0.2
-```
-
-The node must come back on `172.18.0.2`: the API server certificate and the
-kubelet are bound to it. It does when it is the only container on the `kind`
-network, which is the case here.
-
-**5. Check** (from your machine, once `kubectl get nodes` answers again):
-
-```sh
-kubectl get nodes                                       # Ready
-kubectl get pods -A | grep -v -E 'Running|Completed'    # only the header, after a minute or two
-kubectl -n traefik logs deploy/traefik | grep -i -E 'acme|error'
-curl -sv https://srv2052563.hstgr.cloud/ -o /dev/null 2>&1 | grep -E 'issuer|HTTP/'   # Let's Encrypt
-curl -sI http://chat.srv2052563.hstgr.cloud/ | head -1                                 # 301
-curl -s -o /dev/null -w '%{http_code}\n' "http://bookinfo.$NS.195.35.2.222.nip.io/productpage"  # 200
-```
-
-Then by hand: a console opens and its terminal works (WebSocket), a
-`docker push` to the registry goes through, Rocket.Chat loads, and a
-`curl` to a `*.nip.io` URL from a console works (it goes out to the public IP
-and back in through the same mapping).
-
-**6. Clean up**, once it has run for a few days (on the server):
-
-```sh
-for c in srv2052563.hstgr.cloud chat.srv2052563.hstgr.cloud registry.srv2052563.hstgr.cloud; do
-  certbot delete --non-interactive --cert-name $c
-done
-apt purge nginx nginx-common python3-certbot-nginx
-```
-
-**Rollback** (before step 6). On the server:
-
-```sh
-D=/var/lib/docker/containers/$(docker inspect -f '{{.Id}}' training-control-plane)
-systemctl stop docker.socket docker
-cp /root/hostconfig.json.bak "$D/hostconfig.json"
-systemctl start docker && docker start training-control-plane
-systemctl enable --now nginx
-```
-
-then from your machine remove the opt-in, so the routes match on `web` again
-behind nginx:
-
-```sh
-A=traefik.ingress.kubernetes.io/router.entrypoints-
-kubectl -n consoles annotate ingress --all "$A"
-kubectl -n default  annotate ingress hello     "$A"
-kubectl -n headlamp annotate ingress headlamp  "$A"
-kubectl -n registry annotate ingress registry  "$A"
-ssh $S "helm rollback rocketchat -n rocketchat"
-```
-
-### Next rebuild
-
-When the cluster is recreated anyway, put the mapping in the server's kind
-config directly, so the `hostconfig.json` edit is not needed:
-
-```yaml
-extraPortMappings:
-  - { containerPort: 30080, hostPort: 80,  listenAddress: "0.0.0.0" }
-  - { containerPort: 30443, hostPort: 443, listenAddress: "0.0.0.0" }
-```
-
-alongside the API server on `0.0.0.0:6443`. That is also the time to go
-dual-stack (`networking.ipFamily: dual`) if IPv6 matters.
-
-### What the module READMEs assume, and what is actually there
-
-The module READMEs say *"on the shared cluster the trainer has installed
-it"* for a number of add-ons. Today the cluster has **Traefik, Linkerd + viz and kube-prometheus-stack**, and a **single node**. Before each day:
-
-| Needed by | Install | Status |
-| --- | --- | --- |
-| module 1 lab 2, every day after | Linkerd + linkerd-viz | **installed** |
-| module 1 lab 2 step 6 (demo) | Istio | not installed |
-| module 2 lab 1 step 4, module 3 lab 2 step 8 | several worker nodes with `topology.kubernetes.io/zone` labels | **single node** |
-| module 2 lab 2 | Chaos Mesh, with rights on Chaos objects for `admin` | not installed |
-| module 3 | metrics-server, VPA, Prometheus Adapter, KEDA, OpenCost | not installed |
-| module 3, module 5 | kube-prometheus-stack | **installed**, with Linkerd metrics |
-| module 4 | Kyverno / Pod Security labels, audit log, Vault | not installed |
-| module 4 lab 2 step 4 | a CNI that enforces NetworkPolicy, and policies that let the `traefik` namespace reach `productpage` | to check |
+This layout has been assembled from the former session's hand-built cluster
+and from the f021bis cluster; it has not been bootstrapped end to end yet.
+On the first build, look in particular at: the registry (push and pull with
+its htpasswd), the consoles (new image, non-root `ubuntu` user), the shared
+Gateway (an HTTPRoute accepted and served), and NetworkPolicy enforcement.

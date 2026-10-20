@@ -1,0 +1,23 @@
+# One tenant per trainee, rendered by bin/render from trainees.txt:
+# namespace, `admin` in it, its quota, cluster-wide read through Headlamp. In
+# the module 6 GitOps lab the trainer uncomments each trainee's Flux tenant
+# in tenants/kustomization.yaml.
+#
+# Namespaces carry kustomize.toolkit.fluxcd.io/prune: disabled: dropping an
+# trainee from the list stops managing their namespace, it never deletes it
+# with everything they built in it.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: tenants
+  namespace: flux-system
+spec:
+  serviceAccountName: kustomize-controller
+  dependsOn:
+    - name: infra-configs   # trainee-cluster-read, the aggregated roles
+  interval: 10m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./f021/shared-cluster/tenants
+  prune: true

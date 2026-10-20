@@ -1,0 +1,77 @@
+# The platform, in four layers applied in order:
+#
+#   gateway-api         Gateway API CRDs (Linkerd and Traefik's Gateway
+#                       provider need them; trainees write HTTPRoutes in
+#                       the module 2 network lab)
+#   infra-controllers   Helm releases: Traefik, Linkerd, linkerd-viz,
+#                       kube-prometheus-stack, Headlamp, metrics-server,
+#                       VPA, prometheus-adapter
+#   infra-configs       what needs their CRDs: Traefik middlewares and routes,
+#                       the Linkerd dashboard Ingress, Linkerd scrape configs,
+#                       cluster-wide RBAC for trainees
+#
+# `wait: true` makes a layer Ready only once everything in it is healthy, so
+# dependsOn really waits for the CRDs a later layer uses.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: gateway-api
+  namespace: flux-system
+spec:
+  interval: 24h
+  url: https://github.com/kubernetes-sigs/gateway-api
+  # Standard channel; Traefik 3.7 and Linkerd edge both support it.
+  ref:
+    tag: v1.4.0
+  ignore: |
+    /*
+    !/config/crd/standard/
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: gateway-api
+  namespace: flux-system
+spec:
+  serviceAccountName: kustomize-controller
+  interval: 1h
+  sourceRef:
+    kind: GitRepository
+    name: gateway-api
+  path: ./config/crd/standard
+  prune: false          # CRDs: removing one deletes every object of that type
+  wait: true
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: infra-controllers
+  namespace: flux-system
+spec:
+  serviceAccountName: kustomize-controller
+  dependsOn:
+    - name: gateway-api
+  interval: 10m
+  timeout: 15m          # first install pulls every image
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./f021/shared-cluster/infrastructure/controllers
+  prune: true
+  wait: true
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: infra-configs
+  namespace: flux-system
+spec:
+  serviceAccountName: kustomize-controller
+  dependsOn:
+    - name: infra-controllers
+  interval: 10m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./f021/shared-cluster/infrastructure/configs
+  prune: true

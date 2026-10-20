@@ -1,0 +1,6 @@
+# bin/gen-secrets: values and the manifest built from them. Never commit.
+/secrets/
+/secrets.yaml
+
+# make kubeconfig: cluster-admin credentials.
+/kubeconfig

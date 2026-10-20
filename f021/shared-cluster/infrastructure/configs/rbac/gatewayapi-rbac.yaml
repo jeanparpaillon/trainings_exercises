@@ -1,0 +1,51 @@
+# The Gateway API CRDs do not extend the built-in roles, so `admin` in their
+# namespace gave trainees no right on HTTPRoute & co (module 2 network lab:
+# HTTPRoutes on Gateway traefik/traefik-gateway; Linkerd routes, if used). The first two ClusterRoles are aggregated into the built-in
+# ones through their labels: every subject that already has `admin`/`edit`
+# (trainee users, console and headlamp ServiceAccounts, in their namespace)
+# or `view` (headlamp, cluster-wide) gets the matching rights, with no new
+# binding per trainee.
+#
+# GatewayClass is cluster-scoped: an aggregated rule only reaches it through
+# a ClusterRoleBinding, so trainees read it through trainee-cluster-read
+# (trainee-read.yaml) instead.
+#
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: gateway-api-edit
+  labels:
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+    rbac.authorization.k8s.io/aggregate-to-edit: "true"
+rules:
+  - apiGroups: [gateway.networking.k8s.io]
+    resources:
+      - httproutes
+      - grpcroutes
+      - tlsroutes
+      - referencegrants
+      - backendtlspolicies
+      # Trainees attach routes to the shared traefik/traefik-gateway; a
+      # Gateway of their own on GatewayClass `traefik` is allowed too, but
+      # its listeners must use a Traefik entrypoint port (8000).
+      - gateways
+      - listenersets
+    verbs: [get, list, watch, create, update, patch, delete, deletecollection]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: gateway-api-view
+  labels:
+    rbac.authorization.k8s.io/aggregate-to-view: "true"
+rules:
+  - apiGroups: [gateway.networking.k8s.io]
+    resources:
+      - httproutes
+      - grpcroutes
+      - tlsroutes
+      - referencegrants
+      - backendtlspolicies
+      - gateways
+      - listenersets
+    verbs: [get, list, watch]

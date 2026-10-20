@@ -1,0 +1,22 @@
+# Helm values of the `prometheus-adapter` release (prometheus-adapter.yaml).
+prometheus:
+  url: http://kube-prometheus-stack-prometheus.monitoring.svc
+  port: 9090
+
+rules:
+  default: false
+  custom:
+    # requests_per_second per pod, from the Linkerd proxies' request_total
+    # (scraped into this Prometheus by infrastructure/configs/linkerd-scrape.yaml,
+    # which sets the `namespace` and `pod` labels). Needs the workload to be
+    # meshed: the HPA step injects Bookinfo first.
+    #   kubectl get --raw "/apis/custom.metrics.k8s.io/v1beta1/namespaces/$NS/pods/*/requests_per_second"
+    - seriesQuery: 'request_total{direction="inbound",namespace!="",pod!=""}'
+      resources:
+        overrides:
+          namespace: { resource: namespace }
+          pod: { resource: pod }
+      name:
+        matches: ^request_total$
+        as: requests_per_second
+      metricsQuery: sum(rate(<<.Series>>{<<.LabelMatchers>>}[1m])) by (<<.GroupBy>>)

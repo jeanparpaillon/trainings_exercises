@@ -1,0 +1,26 @@
+# The `admin` level: every trainee is cluster-admin, from kubectl (group
+# `trainees`, O=trainees in their certificate) and from their web console
+# (ServiceAccounts of namespace `consoles`). Headlamp follows through
+# tenants/<name>.yaml, rendered with TRAINEES_CLUSTER_ADMIN=true in fleet.env.
+#
+# It overrides every narrower grant of the `trainee` level, which stays in
+# place: to fall back to it, remove this file from rbac/kustomization.yaml,
+# set TRAINEES_CLUSTER_ADMIN=false and run bin/render.
+#
+# What cluster-admin means here: every Secret (other trainees' tokens, the
+# trainer's, Linkerd's CA key, Traefik's ACME account and certificates), every
+# namespace including flux-system, consoles and kube-system — an trainee can
+# suspend or rewrite Flux itself, as two `flux bootstrap` runs from trainees
+# already did — and privileged pods. kind nodes are privileged containers, so
+# a privileged pod with a hostPath mount is root on the server itself.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: trainees-cluster-admin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - { apiGroup: rbac.authorization.k8s.io, kind: Group, name: trainees }   # O=trainees in their certificates
+  - { apiGroup: rbac.authorization.k8s.io, kind: Group, name: "system:serviceaccounts:consoles" }

@@ -1,0 +1,89 @@
+# Linkerd edge, from Helm instead of `linkerd install`: crds, control plane,
+# viz. Same edge release on all three charts; `linkerd version` in the
+# consoles should match it (edge-26.9.3).
+#
+# The identity certificates come from secrets.yaml (bin/gen-secrets):
+#   - Secret flux-system/linkerd-trust-anchor, key ca.crt: the trust anchor,
+#     passed as identityTrustAnchorsPEM through valuesFrom
+#   - Secret linkerd/linkerd-identity-issuer (kubernetes.io/tls): the issuer,
+#     read by the identity controller itself (identity.issuer.scheme)
+# The issuer is valid one year; renew it with bin/gen-secrets --renew-issuer.
+#
+# Gateway API CRDs are not installed by linkerd-crds (installGatewayAPI:
+# false, the default): the gateway-api Kustomization owns them.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: linkerd-crds
+  namespace: flux-system
+spec:
+  serviceAccountName: helm-controller
+  interval: 1h
+  releaseName: linkerd-crds
+  targetNamespace: linkerd
+  storageNamespace: linkerd
+  chart:
+    spec:
+      chart: linkerd-crds
+      version: 2026.9.3
+      sourceRef:
+        kind: HelmRepository
+        name: linkerd-edge
+  install:
+    crds: CreateReplace
+  upgrade:
+    crds: CreateReplace
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: linkerd-control-plane
+  namespace: flux-system
+spec:
+  serviceAccountName: helm-controller
+  dependsOn:
+    - name: linkerd-crds
+  interval: 1h
+  timeout: 10m
+  releaseName: linkerd-control-plane
+  targetNamespace: linkerd
+  storageNamespace: linkerd
+  chart:
+    spec:
+      chart: linkerd-control-plane
+      version: 2026.9.3
+      sourceRef:
+        kind: HelmRepository
+        name: linkerd-edge
+  valuesFrom:
+    - kind: ConfigMap
+      name: linkerd-control-plane-values
+    - kind: Secret
+      name: linkerd-trust-anchor
+      valuesKey: ca.crt
+      targetPath: identityTrustAnchorsPEM
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: linkerd-viz
+  namespace: flux-system
+spec:
+  serviceAccountName: helm-controller
+  dependsOn:
+    - name: linkerd-control-plane
+  interval: 1h
+  timeout: 10m
+  releaseName: linkerd-viz
+  targetNamespace: linkerd-viz
+  storageNamespace: linkerd-viz
+  chart:
+    spec:
+      chart: linkerd-viz
+      version: 2026.9.3
+      sourceRef:
+        kind: HelmRepository
+        name: linkerd-edge
+  valuesFrom:
+    - kind: ConfigMap
+      name: linkerd-viz-values

@@ -1,0 +1,39 @@
+# The Linkerd dashboard at https://linkerd.srv2052563.hstgr.cloud/, behind a
+# shared basic-auth password: Secret linkerd-viz/dashboard-auth, from
+# secrets.yaml (user `trainee`). The Host guard is set in the linkerd-viz
+# values (dashboard.enforcedHostRegexp).
+#
+# The dashboard shows every namespace and can tap any meshed pod with its own
+# ServiceAccount, whoever logs in: hence the password. The host is also listed
+# in traefik-https.yaml for the HTTP -> HTTPS redirect. Traefik is not meshed,
+# so the l5d-dst-override header from Linkerd's ingress docs is not needed.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: dashboard-auth
+  namespace: linkerd-viz
+spec:
+  basicAuth:
+    secret: dashboard-auth
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dashboard
+  namespace: linkerd-viz
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.middlewares: linkerd-viz-dashboard-auth@kubernetescrd
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: linkerd.srv2052563.hstgr.cloud
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 8084

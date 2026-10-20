@@ -13,7 +13,7 @@ This repo holds what the labs run.
 
 | | |
 | --- | --- |
-| [`shared-cluster/`](shared-cluster/) | the session's cluster: connecting, reaching your services through Traefik, trainer setup |
+| [`shared-cluster/`](shared-cluster/) | the session's cluster (kind on one server, platform applied by Flux from this repo): connecting, reaching your services, what each lab needs, how to build it |
 | [`module1/`](module1/) … [`module5/`](module5/) | material of the former program, see [Status per module](#status-per-module) |
 
 ## Conventions (unchanged)
@@ -132,7 +132,7 @@ Legend: ✅ reuse as is · ✏️ update · 🆕 new
 
 | Lab | Slides | Status | Material |
 | --- | --- | --- | --- |
-| Create tenants (trainer demo) | `multi_tenancy.md` | ✏️ | `module1/exerciseA/tenant/` (quota, LimitRange, RBAC, NetworkPolicy). Needs cluster-admin: demo, or compare with the attendees' real tenants in the fleet repo |
+| Create tenants (trainer demo) | `multi_tenancy.md` | ✏️ | `module1/exerciseA/tenant/` (quota, LimitRange, RBAC, NetworkPolicy). Needs cluster-admin: demo, or compare with the trainees' tenants in [`shared-cluster/tenants/`](shared-cluster/tenants/) |
 | Backup and restore (trainer demo) | `backup.md` | ✏️ | Port `f021bis/module1/lab4/` step3-velero and step4-schedule; etcd steps stay in f021bis |
 | Production checklist on the sample app and Bookinfo | `prod_checklist.md` | 🆕 | A checklist file to fill in, one line per item, each pointing to its module |
 

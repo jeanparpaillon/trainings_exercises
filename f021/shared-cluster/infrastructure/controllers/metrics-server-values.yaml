@@ -1,0 +1,6 @@
+# Helm values of the `metrics-server` release (metrics-server.yaml).
+#
+# kind's kubelets serve a self-signed certificate: without this flag every
+# scrape fails with "x509: cannot validate certificate".
+args:
+  - --kubelet-insecure-tls

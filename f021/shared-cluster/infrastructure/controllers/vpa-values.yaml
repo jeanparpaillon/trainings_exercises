@@ -1,0 +1,7 @@
+# Helm values of the `vpa` release (vpa.yaml): recommender only.
+recommender:
+  enabled: true
+updater:
+  enabled: false
+admissionController:
+  enabled: false

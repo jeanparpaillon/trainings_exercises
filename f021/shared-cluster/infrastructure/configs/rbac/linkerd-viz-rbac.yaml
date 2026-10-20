@@ -1,0 +1,47 @@
+# What trainees need to drive linkerd-viz from their console or kubectl
+# (mesh deep dive; troubleshooting when Bookinfo is meshed). Reading the
+# linkerd-viz namespace itself comes from trainee-read.yaml.
+#
+# 1. `linkerd viz check | stat | top | edges | routes` port-forward to the
+#    metrics-api pod. RBAC cannot narrow pods/portforward to one Deployment
+#    (pod names change, resourceNames has no wildcard), so this covers every
+#    pod in linkerd-viz: metrics-api, prometheus, web. They expose metrics
+#    for the whole cluster, which trainees can already read.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: trainee-portforward
+  namespace: linkerd-viz
+rules:
+  - apiGroups: [""]
+    resources: [pods/portforward]
+    verbs: [create]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: trainee-portforward
+  namespace: linkerd-viz
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: trainee-portforward
+subjects:
+  - { apiGroup: rbac.authorization.k8s.io, kind: Group, name: trainees }   # O=trainees in their certificates
+  - { apiGroup: rbac.authorization.k8s.io, kind: Group, name: "system:serviceaccounts:consoles" }
+---
+# 2. `linkerd viz tap` goes through the tap.linkerd.io APIService, whose
+#    access is RBAC on `watch`. Aggregated into `admin`, so each trainee can
+#    tap their own namespace only: tap shows live requests (method, path,
+#    authority, status), and other trainees' traffic is theirs. (The
+#    dashboard's own ServiceAccount can still tap everything.)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: linkerd-viz-tap-namespace
+  labels:
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+rules:
+  - apiGroups: [tap.linkerd.io]
+    resources: ["*"]
+    verbs: [watch]

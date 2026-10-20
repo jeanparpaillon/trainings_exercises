@@ -1,0 +1,26 @@
+# Trainee RBAC, two levels:
+#
+#   trainee   write in their own namespace (`admin`, bound per tenant), read
+#             the rest of the cluster, Secrets excepted; Gateway API, linkerd
+#             viz tap, mariadb-operator, VPA and custom metrics aggregated
+#             into admin/edit/view
+#   admin     the above, plus cluster-admin everywhere
+#
+# The `trainee` files are always applied; trainees-cluster-admin.yaml adds the
+# `admin` level on top. Keep it in line with TRAINEES_CLUSTER_ADMIN in fleet.env.
+#
+# The labs assume `trainee` (namespace admin, not cluster-admin): the module 5
+# RBAC lab starts from those rights, and anything needing more is a trainer
+# demo. Uncomment trainees-cluster-admin.yaml only to unblock a session.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  # trainee
+  - trainee-read.yaml
+  - gatewayapi-rbac.yaml
+  - linkerd-viz-rbac.yaml
+  - mariadb-operator-rbac.yaml
+  - vpa-rbac.yaml
+  - custom-metrics-rbac.yaml
+  # admin
+  # - trainees-cluster-admin.yaml

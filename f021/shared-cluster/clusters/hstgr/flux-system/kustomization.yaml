@@ -1,0 +1,51 @@
+# Committed before `flux bootstrap`: bootstrap writes gotk-components.yaml and
+# gotk-sync.yaml next to it and keeps these patches.
+#
+# Multi-tenancy lockdown (fluxcd/flux2-multi-tenancy):
+#
+#   --no-cross-namespace-refs   a tenant's Kustomization/HelmRelease can only use
+#                               sources in its own namespace
+#   --default-service-account   a Kustomization/HelmRelease without
+#                               serviceAccountName impersonates `default` of its
+#                               namespace, which has no rights, instead of the
+#                               controller's cluster-admin
+#   --no-remote-bases           no `resources: [https://...]` in kustomizations
+#
+# The consequence for this repo: every Kustomization and HelmRelease of the
+# platform names its ServiceAccount explicitly (kustomize-controller or
+# helm-controller, in flux-system). The last patch does it for the bootstrap
+# Kustomization itself.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - gotk-components.yaml
+  - gotk-sync.yaml
+patches:
+  - patch: |
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: --no-cross-namespace-refs=true
+    target:
+      kind: Deployment
+      name: "(kustomize-controller|helm-controller|notification-controller|image-reflector-controller|image-automation-controller)"
+  - patch: |
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: --no-remote-bases=true
+    target:
+      kind: Deployment
+      name: kustomize-controller
+  - patch: |
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: --default-service-account=default
+    target:
+      kind: Deployment
+      name: "(kustomize-controller|helm-controller)"
+  - patch: |
+      - op: add
+        path: /spec/serviceAccountName
+        value: kustomize-controller
+    target:
+      kind: Kustomization
+      name: flux-system

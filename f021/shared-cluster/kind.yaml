@@ -1,0 +1,37 @@
+# The f021 shared cluster, on the server (make create).
+#
+# Single node, the same layout as the f021bis cluster
+# (../../f021bis/shared-cluster/kind.yaml): Traefik's NodePorts 30080/30443
+# published on the server's 0.0.0.0:80/443, nothing in front of it
+# (infrastructure/controllers/traefik-values.yaml); API on 0.0.0.0:6443. Both
+# clusters claim these ports: only one of them runs on the server at a time.
+#
+# IPv4 only: the host names have AAAA records, but kube-proxy programs no IPv6
+# NodePort, so a mapping on `::` would hit nothing. Dual stack needs
+# `networking.ipFamily: dual` and a recreate.
+#
+# Port mappings are fixed at creation: changing them means make delete create,
+# which loses every PVC (consoles' homes, Prometheus, Grafana, acme.json).
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: training
+networking:
+  # Reachable from the trainer's machine (make kubeconfig) and the trainees'
+  # local kubectl. kind warns about it; the API still needs a client
+  # certificate or a token.
+  apiServerAddress: "0.0.0.0"
+  apiServerPort: 6443
+kubeadmConfigPatches:
+  - |
+    kind: ClusterConfiguration
+    apiServer:
+      certSANs:
+        - srv2052563.hstgr.cloud
+        - 195.35.2.222
+        - 127.0.0.1
+        - localhost
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      - { containerPort: 30080, hostPort: 80,  listenAddress: "0.0.0.0", protocol: TCP }
+      - { containerPort: 30443, hostPort: 443, listenAddress: "0.0.0.0", protocol: TCP }

@@ -1,0 +1,18 @@
+# What the room uses besides the platform: the trainees' web consoles and
+# the image registry. Both are reached through Traefik with HTTPS, hence the
+# dependency on infra-configs (the to-https redirect router).
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: room
+  namespace: flux-system
+spec:
+  serviceAccountName: kustomize-controller
+  dependsOn:
+    - name: infra-configs
+  interval: 10m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./f021/shared-cluster/room
+  prune: true

@@ -1,0 +1,20 @@
+# Read access to the custom metrics API served by prometheus-adapter, so
+# trainees can check a metric exists before writing an HPA on it (module 3
+# lab, "HPA on request rate"):
+#
+#   kubectl get --raw "/apis/custom.metrics.k8s.io/v1beta1/namespaces/$NS/pods/*/requests_per_second"
+#
+# Aggregated into `view`, hence admin/edit too: namespaced reads, limited to
+# the namespaces where the subject already has one of those roles.
+# (metrics.k8s.io, for `kubectl top`, is aggregated by the metrics-server
+# chart itself.)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: trainee-custom-metrics-view
+  labels:
+    rbac.authorization.k8s.io/aggregate-to-view: "true"
+rules:
+  - apiGroups: [custom.metrics.k8s.io]
+    resources: ["*"]
+    verbs: [get, list]

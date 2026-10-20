@@ -1,0 +1,58 @@
+# Declared here rather than created by Helm: secrets.yaml has already put
+# Secrets in some of them before bootstrap, and Helm refuses to adopt a
+# namespace it did not create. Linkerd's charts only render their namespace
+# for the CLI (`if eq .Release.Service "CLI"`), so the labels the CLI would
+# set are copied here from the 2026.9.3 templates.
+#
+# prune: disabled — a namespace removed from this file by mistake must not
+# take its PVCs (Prometheus, Grafana, acme.json) with it.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: traefik
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: linkerd
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
+    linkerd.io/inject: disabled
+  labels:
+    linkerd.io/is-control-plane: "true"
+    config.linkerd.io/admission-webhooks: disabled
+    linkerd.io/control-plane-ns: linkerd
+    pod-security.kubernetes.io/enforce: privileged   # linkerd-init, no CNI plugin
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: linkerd-viz
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
+  labels:
+    linkerd.io/extension: viz
+    pod-security.kubernetes.io/enforce: privileged
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: headlamp
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: vpa
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
