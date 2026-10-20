@@ -1,0 +1,9 @@
+[web]
+node[1:2]
+
+[db]
+node3
+
+[prod:children]
+web
+db

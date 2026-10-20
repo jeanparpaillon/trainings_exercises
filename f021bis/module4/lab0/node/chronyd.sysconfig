@@ -1,0 +1,5 @@
+# m4-node: chronyd must not set the clock. The node is a privileged container
+# (CAP_SYS_TIME) sharing the SERVER's kernel: without -x, every trainee's
+# chronyd would steer the server's clock. Here before chrony is installed
+# (lab 1 step 4); rpm keeps it (%config(noreplace)) and writes .rpmnew.
+OPTIONS="-F 2 -x"

@@ -41,9 +41,10 @@ module2/README.md          Ansible for Kubernetes: spec of labs 1-3 (kubernetes.
 module3/README.md          Zabbix: spec of labs 1-4 (3 trainees, alone, one proxy
                            each on the room's Zabbix 7.0, discovery, Prometheus
                            metrics, alerts + drill), lab0; bin/zabbix users is
-                           written (tested locally). lab0, labs 1-3 and
-                           catch-up-lab1/2/3 written and validated on the
-                           server (console-jean); lab 4 not written. lab0/zapi
+                           written (tested locally). lab0, labs 1-4 and
+                           catch-up-lab1…4 written and validated on the
+                           server (console-jean), through the API (step
+                           files give UI paths). lab0/zapi
                            = the API as the trainee (role Admin: no
                            Administration menu, no configuration.import of
                            hosts linked to shipped templates — lab0/import).
@@ -53,8 +54,10 @@ module4/README.md          Ansible certification: spec of labs 1-5, lab0, exam.
                            lab0 written (Rocky 9 node image in the exam's initial
                            state: root/redhat over SSH only; m4 network, fixed
                            IPs; refuses to start beside module 2's same-named
-                           nodes) and run on a laptop, not on the server; step
-                           files and exam not written
+                           nodes) and lab 1 + catch-up-lab1 written, both run on
+                           a laptop (console = ubuntu:24.04 + its ansible 2.16.3,
+                           OpenSSH 9.6: no `ssh-keyscan -q`), not on the server;
+                           labs 2-5 and exam not written
 ```
 
 Bookinfo states are cumulative overlays: `bookinfo/` → `lab2/step3-install`

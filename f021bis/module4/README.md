@@ -6,10 +6,12 @@ are in `../../../trainings/f021bis/slides/module4.md`, one sub-deck per session
 slides it belongs to, and the slides point back with
 `📖 module4/README.md — Lab N`.
 
-> **Status: specification.** This README describes what each lab must
-> contain and check; the step files, `lab0/` and `exam/` are not written yet
-> and nothing here has been run. Items marked **(to validate)** are
-> assumptions to confirm on the first dry run.
+> **Status: specification**, except `lab0/` and lab 1 (step files,
+> solution, `make catch-up-lab1`), which are written and were run on a
+> laptop (Docker 29.1.3, cgroup v2, 2026-10-20; console stood in for by
+> `ubuntu:24.04` with its `ansible` package) — not yet in a console on the
+> server. Labs 2–5 and `exam/` are not written yet. Items marked
+> **(to validate)** are assumptions to confirm on the first dry run.
 
 | | Lab | Session | Guided |
 | --- | --- | --- | --- |
@@ -59,43 +61,68 @@ Groups used across the labs:
 | `node2` | `web` | `web`, `prod` | `web`, `prod` |
 | `node3` | `db` | `db`, `prod` | `db`, `prod` — MariaDB |
 
-## Managed hosts — requirements for `lab0/`
+## Managed hosts — `lab0/`
 
-`lab0/` must provide, from `module4/`:
+`lab0/` provides, from `module4/`:
 
 | Target | Does |
 | --- | --- |
 | `make -C lab0 image` | builds `m4-node:latest` in the console's Docker (Dockerfile in `lab0/node/`) |
-| `make -C lab0 up` | creates the network `m4` and `node1`…`node3`, writes their IPs into the console's `/etc/hosts` |
-| `make -C lab0 reset` | deletes and recreates the three nodes in their **initial** state (used before lab 1 and before the exam) |
-| `make -C lab0 down` | deletes nodes and network |
-| `make -C lab0 pull-consoles` | trainer, from their machine: builds the image in every console before session 1 |
+| `make -C lab0 up` | network `m4` (`172.30.4.0/24`), `node1`…`node3` at **fixed IPs** `.11`–`.13`, their names in the console's `/etc/hosts`, their new host keys in `~/.ssh/known_hosts` (old ones removed) |
+| `make -C lab0 reset` | `down` then `up`: the three nodes back in their **initial** state (before lab 1, lab 4's checks and the exam) |
+| `make -C lab0 down` | deletes the nodes (those labelled `f021bis.module=m4` only) and the network |
+| `make -C lab0 check` | ansible and sshpass in the console, image, per node: state, IP, `systemctl is-system-running`, firewalld; `node1` resolves; password login offered; Rocky mirrors reachable |
+| `make -C lab0 pull-consoles` | trainer, from their machine: in every console, module 2's nodes `down`, then `image up` (before session 1) |
 
-The node image:
+The node image (`lab0/node/`):
 
-- `rockylinux/rockylinux:9-ubi-init` (or `9` + `systemd`) as base,
-  with **`systemd` as PID 1** — the labs start, enable and restart services;
-- `openssh-server`, `python3`, `sudo`, `firewalld`, `policycoreutils`
-  installed; `nginx`, `mariadb-server` **not** installed (the labs do it);
+- `rockylinux/rockylinux:9` + `systemd`, **`systemd` as PID 1** — the labs
+  start, enable and restart services. Masked: gettys, udev, logind,
+  `remount-fs` and two API mounts, so that `systemctl is-system-running` says
+  `running`, not `degraded`;
+- `openssh-server`, `python3`, `sudo`, `firewalld` (enabled),
+  `policycoreutils` installed; `nginx`, `mariadb-server` **not** installed
+  (the labs do it). SELinux is `Disabled` in a container: `policycoreutils`
+  is there for the modules, not for enforcement;
 - **initial state = exam state**: only `root`, password login over SSH
-  allowed (`PermitRootLogin yes`, `PasswordAuthentication yes`), root password
-  `redhat`; no `ansible` user, no key. Lab 1 step 2 and exam task 2 are the
-  bootstrap;
-- `dnf` must work: either the console's network reaches the Rocky mirrors
-  **(to validate)**, or `lab0` serves a local repo (`createrepo` of the RPMs
-  the labs need: `nginx`, `mariadb-server`, `python3-PyMySQL`, `chrony`,
-  `tree`) from a fourth container;
-- run with `--privileged --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup:rw`
-  for systemd **(to validate: systemd in a container in dind in a kind node;
-  if it does not boot, fall back to `--tmpfs /run --tmpfs /tmp` and cgroup v2
-  delegation, and record which worked here)**;
-- firewalld running inside the container **(to validate)**; if it cannot,
-  lab 2 step 4 and exam task 6 drop the firewall part, and the slides say so.
+  (`/etc/ssh/sshd_config.d/00-m4.conf`: `PermitRootLogin yes`,
+  `PasswordAuthentication yes`), root password `redhat`; no `ansible` user,
+  no key, no sudo rule. Lab 1 step 2 and exam task 2 are the bootstrap;
+- `machine-id` and SSH host keys are removed from the image, so each node
+  makes its own at boot; `up` scans the new keys into `known_hosts` as
+  `node1,172.30.4.11 …`, which `ansible -k` needs (sshpass cannot answer a
+  host key prompt). Host key checking itself stays on, as on the exam;
+- run as module 2 runs its nodes: `--privileged`, seccomp/apparmor
+  unconfined, `--cgroupns=private --tmpfs /run --tmpfs /tmp`. Not
+  `--cgroupns=host -v /sys/fs/cgroup…`, which the first draft of this spec
+  had: the module 2 flags were already proven in dind;
+- **module 2's nodes have the same names**: `up` stops with a message if a
+  `node1`…`node3` without the m4 label exists, and drops module 2's
+  `/etc/hosts` block and its `~/.ssh/config` block (`Host node?`,
+  `User ansible`, no host key checking), which would otherwise make a
+  missing `remote_user` in lab 1 go unnoticed.
 
-From the console, `ssh root@node1` must work by name, and `curl http://node1`
-must reach port 80 on the container (the console and the dind sidecar share
-the pod's network namespace, so the `m4` bridge is reachable **(to
-validate)**).
+Checked on the laptop run: systemd `running` with no failed unit on all
+three nodes; `ssh root@<ip>` with password `redhat` logs in; firewalld
+**filters** — `curl` to an installed, started nginx is refused until
+`firewall-cmd --add-service=http`, then 200 — so lab 2 step 4 and exam task
+6 keep the firewall part; `reset` brings back a node without nginx and with
+new host keys, in ~3 s.
+
+`dnf` goes to the Rocky mirrors (no local repo). On the laptop the first
+metadata download took **4 min 36 s** on one node, then `dnf install nginx`
+6 s; a later fresh node installed nginx without that delay. Three nodes per
+trainee each fetching metadata after every `reset` is the risk: measure it
+from a console **(to validate)**, and if it is slow, bake the metadata into
+the image or fall back to a local repo (`createrepo` of `nginx`,
+`mariadb-server`, `python3-PyMySQL`, `chrony`, `tree`, `php`, `mariadb`) in
+a fourth container.
+
+Still **to validate in a console**: systemd booting in dind inside a kind
+node (module 2's flags, but module 2 ran on a laptop too), `ssh root@node1`
+and `curl http://node1` by name from the console (the console and the dind
+sidecar share the pod's network namespace, so the `m4` bridge should be
+reachable), and `/etc/hosts` being writable there (`up` says so if not).
 
 ## Conventions
 
@@ -126,9 +153,9 @@ validate)**).
 
 | Tool | Where |
 | --- | --- |
-| `ansible` (ansible-core 2.16, from Ubuntu 24.04) | console image — check `ansible --version` there **(to validate)**, and whether `ansible.posix`, `community.general`, `community.mysql` come with it |
+| `ansible` (ansible-core 2.16.3, from Ubuntu 24.04) | console image; Ubuntu's `ansible` 9.x bundles ansible.posix 1.5.4, community.general 8.3.0, community.mysql 3.8.0, community.crypto 2.17.1 (checked in an `ubuntu:24.04` container; confirm in a console **(to validate)**) |
 | `git`, `ssh`, `ssh-keygen`, `ssh-copy-id`, `curl` | console image (`ssh-copy-id` is in `openssh-client`) |
-| `sshpass` | needed by `ansible -k` (password SSH, lab 1 step 2) — **not in the console image**: add it to `shared-cluster/console/Dockerfile` |
+| `sshpass` | needed by `ansible -k` (password SSH, lab 1 step 2) — added to `shared-cluster/console/Dockerfile` in `f021bis-console:3`; consoles still on `:2` lack it (`make -C lab0 check` says so) |
 | `docker` | console image (dind sidecar), for `lab0` only |
 
 ## Lab 1 — inventory and ad-hoc tasks (session 1)
@@ -149,19 +176,24 @@ Start: `make -C lab0 reset` (root + password only).
    `remote_user = ansible`, `[privilege_escalation] become = true`;
    `ansible --version` must show `~/m4/ansible.cfg`. Question: what happens
    if the dir is world-writable?
-2. `ssh-keygen -t ed25519`; **ad-hoc only**, as `root` with `-u root -k`:
-   user `ansible` in `wheel`, its `authorized_key`, `/etc/sudoers.d/ansible`
-   with `NOPASSWD`, validated with `visudo -cf %s`.
+2. `ssh-keygen -t ed25519`; **ad-hoc only**, as `root` with `-u root -k`
+   and `-i node1,node2,node3,` (no inventory yet): user `ansible` in
+   `wheel`, its `authorized_key`, `/etc/sudoers.d/ansible` with `NOPASSWD`,
+   validated with `visudo -cf %s`. Kept in `~/m4/bootstrap.sh`, which lab 4
+   and the exam reuse.
 3. INI inventory: `[web] node[1:2]`, `[db] node3`, `[prod:children] web db`;
-   `ansible-inventory --graph`.
+   `ansible-inventory --graph`; the `-i` dropped from `bootstrap.sh`.
 4. Ad-hoc, no `-u`/`-k`/`-b`: `chrony` installed, `chronyd` started and
    enabled, user `devops` created, `/etc/motd` with `content=`; find each
-   module with `ansible-doc -l` / `-s`.
-5. Run every command of step 4 again; add a `command` and a `shell` one;
-   explain which stay `changed`.
+   module with `ansible-doc -l` / `-s`. Kept in `~/m4/adhoc.sh`. chronyd
+   runs with `-x` (set in the node image): it must not steer the server's
+   clock.
+5. Run every command of steps 2 and 4 again; add a `command` and a `shell`
+   one; explain which stay `changed`.
 
 End state: `ansible all -m ansible.builtin.ping` green with no option; repo
-committed, tag `lab1`.
+committed, tag `lab1`. Written: [`lab1/`](lab1/), `make catch-up-lab1`;
+findings at the end of `lab1/README.md`.
 
 ## Lab 2 — a web service, idempotent (session 2)
 
@@ -356,13 +388,15 @@ objectives, and adjust tasks that rely on tools the exam now requires
 
 ## Size (trainer)
 
-Not measured yet. Estimate per trainee: three Rocky 9 containers with
-systemd, sshd, nginx or MariaDB ≈ 150–300 MiB each, so ≤ 1 GiB per console
-and ~6–8 GiB for 8 trainees on the server's 15 GiB, plus the node image
-(~250 MB) per console. Measure on the first dry run and replace this
-paragraph with the numbers, as in module 1.
+Measured on the laptop (not yet on the server): the node image is 456 MB
+(uncompressed) per console; an idle node uses ~41 MiB, ~57 MiB with nginx
+installed and running. Three nodes are therefore well under 300 MiB per
+console before MariaDB; measure again with lab 5's end state (MariaDB, the
+fake app) on the first dry run and replace this paragraph with the numbers,
+as in module 1.
 
-Before session 1: `make -C lab0 pull-consoles` (image in every console),
-`make -C lab0 up` in each, and `ansible all -m ping -u root -k` from one
-console to prove the path. Before session 6: `make -C lab0 reset` in every
+Before session 1: roll the consoles to `f021bis-console:3` (sshpass), then
+`make -C lab0 pull-consoles` (module 2's nodes down, image built and nodes up
+in every console), `make -C lab0 check` and `ansible all -i node1,node2,node3
+-m ping -u root -k` from one console to prove the path. Before session 6: `make -C lab0 reset` in every
 console.
