@@ -116,8 +116,9 @@ check:
 	ok 'ssh root@node1' "$$(ssh -o BatchMode=yes -o ConnectTimeout=5 -o PreferredAuthentications=none \
 	  -o UserKnownHostsFile=$(KNOWN_HOSTS) root@$(NODE_PREFIX).11 true 2>&1 \
 	  | grep -q 'Permission denied (.*password' && echo 'password login offered' || echo FAILED)"; \
-	ok 'mirrors from node1' "$$(docker exec node1 curl -sf -m 10 -o /dev/null \
-	  'https://mirrors.rockylinux.org/mirrorlist?arch=x86_64&repo=BaseOS-9' && echo reachable || echo FAILED)"
+	ok 'dnf cache on node1' "$$(docker exec node1 dnf -C -q repoquery nginx 2>/dev/null | grep -q nginx && echo ok || echo MISSING)"; \
+	ok 'dl.rockylinux.org' "$$(docker exec node1 curl -sf -m 10 -o /dev/null https://dl.rockylinux.org/pub/rocky/9/ \
+	  && echo 'reachable (only for packages outside the cache)' || echo 'unreachable (fine: the labs use the cache)')"
 
 pull-consoles:
 	for d in $$($(CONSOLES_KUBECTL) get deploy -o name); do \

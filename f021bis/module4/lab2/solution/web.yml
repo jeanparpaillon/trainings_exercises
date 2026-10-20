@@ -1,0 +1,53 @@
+---
+- name: Web servers
+  hosts: web
+  vars:
+    web_users:
+      - name: alice
+        shell: /bin/bash
+      - name: bob
+        shell: /bin/sh
+
+  tasks:
+    - name: nginx is installed
+      ansible.builtin.dnf:
+        name: nginx
+        state: present
+
+    - name: The page names its host
+      ansible.builtin.copy:
+        content: "Hello from {{ inventory_hostname }}\n"
+        dest: /usr/share/nginx/html/index.html
+        mode: "0644"
+
+    - name: nginx.conf is ours
+      ansible.builtin.copy:
+        src: nginx.conf
+        dest: /etc/nginx/nginx.conf
+        mode: "0644"
+      notify: Restart nginx
+
+    - name: HTTP is open in the firewall
+      ansible.posix.firewalld:
+        service: http
+        permanent: true
+        immediate: true
+        state: enabled
+
+    - name: nginx is running and enabled
+      ansible.builtin.service:
+        name: nginx
+        state: started
+        enabled: true
+
+    - name: Web users exist
+      ansible.builtin.user:
+        name: "{{ item.name }}"
+        shell: "{{ item.shell }}"
+      loop: "{{ web_users }}"
+
+  handlers:
+    - name: Restart nginx
+      ansible.builtin.service:
+        name: nginx
+        state: restarted

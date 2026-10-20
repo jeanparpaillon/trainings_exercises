@@ -1,7 +1,7 @@
 # m4-node: a Rocky Linux 9 managed host in the EXAM's initial state — root
 # with a password over SSH, nothing else. No `ansible` user, no key, no sudo
 # rule: lab 1 step 2 and exam task 2 are that bootstrap. nginx and MariaDB are
-# not installed either; the labs do it, from the Rocky mirrors.
+# not installed either; the labs do it, from the RPMs already in dnf's cache.
 #
 #   make -C lab0 image
 FROM rockylinux/rockylinux:9
@@ -26,6 +26,21 @@ RUN dnf -y install --setopt=install_weak_deps=False \
  # new ones, and lab0 up refreshes the console's known_hosts.
  && rm -f /etc/ssh/ssh_host_*key* \
  && echo redhat | passwd --stdin root >/dev/null
+
+# Every package the labs and the exam install, downloaded now, with the repo
+# metadata: `dnf install` on a node then needs no network. The mirrorlist
+# picked dead mirrors on the dry run, and each node fetched ~111 MB of
+# metadata after every reset; dl.rockylinux.org (Rocky's CDN-fronted origin)
+# is kept for anything outside this list. metadata_expire=-1 keeps the baked
+# metadata — rebuild the image before each course. Weak dependencies are
+# downloaded too: ansible.builtin.dnf installs them (install_weak_deps
+# defaults to true there, whatever dnf.conf says; nginx recommends logrotate).
+RUN sed -i -e 's/^mirrorlist=/#mirrorlist=/' \
+      -e 's|^#baseurl=http://dl.rockylinux.org/|baseurl=https://dl.rockylinux.org/|' \
+      /etc/yum.repos.d/rocky*.repo \
+ && printf '%s\n' keepcache=True metadata_expire=-1 >> /etc/dnf/dnf.conf \
+ && dnf -y install --downloadonly --setopt=install_weak_deps=True \
+      nginx mariadb-server mariadb python3-PyMySQL chrony tree php
 
 # Read before sshd_config's own settings: for sshd the first value wins.
 COPY sshd-m4.conf /etc/ssh/sshd_config.d/00-m4.conf

@@ -54,10 +54,12 @@ module4/README.md          Ansible certification: spec of labs 1-5, lab0, exam.
                            lab0 written (Rocky 9 node image in the exam's initial
                            state: root/redhat over SSH only; m4 network, fixed
                            IPs; refuses to start beside module 2's same-named
-                           nodes) and lab 1 + catch-up-lab1 written, both run on
-                           a laptop (console = ubuntu:24.04 + its ansible 2.16.3,
-                           OpenSSH 9.6: no `ssh-keyscan -q`), not on the server;
-                           labs 2-5 and exam not written
+                           nodes; dnf offline: metadata + every lab RPM baked in
+                           its cache, weak deps included) and labs 1-2 +
+                           catch-up-lab1/2 written, run on a laptop (console =
+                           ubuntu:24.04 + its ansible 2.16.3, OpenSSH 9.6: no
+                           `ssh-keyscan -q`), not on the server; labs 3-5 and
+                           exam not written
 ```
 
 Bookinfo states are cumulative overlays: `bookinfo/` → `lab2/step3-install`

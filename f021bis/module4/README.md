@@ -6,11 +6,11 @@ are in `../../../trainings/f021bis/slides/module4.md`, one sub-deck per session
 slides it belongs to, and the slides point back with
 `📖 module4/README.md — Lab N`.
 
-> **Status: specification**, except `lab0/` and lab 1 (step files,
-> solution, `make catch-up-lab1`), which are written and were run on a
+> **Status: specification**, except `lab0/` and labs 1–2 (step files,
+> solutions, `make catch-up-lab1/2`), which are written and were run on a
 > laptop (Docker 29.1.3, cgroup v2, 2026-10-20; console stood in for by
 > `ubuntu:24.04` with its `ansible` package) — not yet in a console on the
-> server. Labs 2–5 and `exam/` are not written yet. Items marked
+> server. Labs 3–5 and `exam/` are not written yet. Items marked
 > **(to validate)** are assumptions to confirm on the first dry run.
 
 | | Lab | Session | Guided |
@@ -71,7 +71,7 @@ Groups used across the labs:
 | `make -C lab0 up` | network `m4` (`172.30.4.0/24`), `node1`…`node3` at **fixed IPs** `.11`–`.13`, their names in the console's `/etc/hosts`, their new host keys in `~/.ssh/known_hosts` (old ones removed) |
 | `make -C lab0 reset` | `down` then `up`: the three nodes back in their **initial** state (before lab 1, lab 4's checks and the exam) |
 | `make -C lab0 down` | deletes the nodes (those labelled `f021bis.module=m4` only) and the network |
-| `make -C lab0 check` | ansible and sshpass in the console, image, per node: state, IP, `systemctl is-system-running`, firewalld; `node1` resolves; password login offered; Rocky mirrors reachable |
+| `make -C lab0 check` | ansible and sshpass in the console, image, per node: state, IP, `systemctl is-system-running`, firewalld; `node1` resolves; password login offered; dnf's baked cache present; `dl.rockylinux.org` reachable (informative) |
 | `make -C lab0 pull-consoles` | trainer, from their machine: in every console, module 2's nodes `down`, then `image up` (before session 1) |
 
 The node image (`lab0/node/`):
@@ -82,8 +82,11 @@ The node image (`lab0/node/`):
   `running`, not `degraded`;
 - `openssh-server`, `python3`, `sudo`, `firewalld` (enabled),
   `policycoreutils` installed; `nginx`, `mariadb-server` **not** installed
-  (the labs do it). SELinux is `Disabled` in a container: `policycoreutils`
-  is there for the modules, not for enforcement;
+  (the labs do it, from dnf's cache — see below). SELinux is `Disabled` in
+  a container: `policycoreutils` is there for the modules, not for
+  enforcement;
+- `/etc/sysconfig/chronyd` with `-x`: chronyd (lab 1 step 4) must not set
+  the clock — a privileged container would steer the server's;
 - **initial state = exam state**: only `root`, password login over SSH
   (`/etc/ssh/sshd_config.d/00-m4.conf`: `PermitRootLogin yes`,
   `PasswordAuthentication yes`), root password `redhat`; no `ansible` user,
@@ -109,14 +112,25 @@ three nodes; `ssh root@<ip>` with password `redhat` logs in; firewalld
 6 keep the firewall part; `reset` brings back a node without nginx and with
 new host keys, in ~3 s.
 
-`dnf` goes to the Rocky mirrors (no local repo). On the laptop the first
-metadata download took **4 min 36 s** on one node, then `dnf install nginx`
-6 s; a later fresh node installed nginx without that delay. Three nodes per
-trainee each fetching metadata after every `reset` is the risk: measure it
-from a console **(to validate)**, and if it is slow, bake the metadata into
-the image or fall back to a local repo (`createrepo` of `nginx`,
-`mariadb-server`, `python3-PyMySQL`, `chrony`, `tree`, `php`, `mariadb`) in
-a fourth container.
+**`dnf` needs no network on the nodes.** The image carries the repo
+metadata and every RPM the labs and the exam install — `nginx`,
+`mariadb-server`, `mariadb`, `python3-PyMySQL`, `chrony`, `tree`, `php`,
+with their weak dependencies — in dnf's cache (`keepcache=True`,
+`metadata_expire=-1` in `/etc/dnf/dnf.conf`). Proved by running labs 1–2
+with the nodes' default route deleted. Why: Rocky's mirrorlist sent this
+laptop to dead or crawling mirrors (one `dnf install chrony` failed on
+curl timeouts), and each node downloaded ~111 MB of metadata after every
+`reset` — ~2.6 GB per room per reset. Consequences:
+
+- **rebuild the image before each course** (`make -C lab0 pull-consoles`):
+  the baked metadata points at the current Rocky 9 minor, whose packages
+  move to the vault when the next minor ships;
+- a package **outside that list** still downloads, from `dl.rockylinux.org`
+  (Rocky's CDN-fronted origin, set as `baseurl=` instead of the
+  mirrorlist) — add it to the list in `lab0/node/Dockerfile` rather than
+  rely on that;
+- weak dependencies have to be in the cache: `ansible.builtin.dnf`
+  installs them whatever `dnf.conf` says (nginx recommends `logrotate`).
 
 Still **to validate in a console**: systemd booting in dind inside a kind
 node (module 2's flags, but module 2 ran on a laptop too), `ssh root@node1`
@@ -227,7 +241,10 @@ lab 3 templates).
 Checks: `curl http://node1`, `curl http://node2` from the console show each
 host name. Questions in the step files: which task would break idempotence
 with `shell: echo … > index.html`? when does the handler *not* run although
-notified (play failed before the end)?
+notified (play failed before the end — and the next run does not restart
+either)? Written: [`lab2/`](lab2/) (given `nginx.conf`: the whole file,
+2 workers, port 80, header `X-Managed-By: ansible`, the base of lab 3's
+template), `make catch-up-lab2`; findings at the end of `lab2/README.md`.
 
 ## Lab 3 — one template, two environments (session 3)
 
@@ -388,8 +405,10 @@ objectives, and adjust tasks that rely on tools the exam now requires
 
 ## Size (trainer)
 
-Measured on the laptop (not yet on the server): the node image is 456 MB
-(uncompressed) per console; an idle node uses ~41 MiB, ~57 MiB with nginx
+Measured on the laptop (not yet on the server): the node image is 751 MB
+(uncompressed) per console, ~300 MB of it dnf's cache (metadata and the
+labs' RPMs); building it downloads that once per console, where three
+nodes per reset used to fetch the metadata each; an idle node uses ~41 MiB, ~57 MiB with nginx
 installed and running. Three nodes are therefore well under 300 MiB per
 console before MariaDB; measure again with lab 5's end state (MariaDB, the
 fake app) on the first dry run and replace this paragraph with the numbers,

@@ -5,8 +5,10 @@
 #
 #   make catch-up-lab1    ~/m4 = lab1/solution, tagged lab1; nodes bootstrapped
 #                         (user ansible, your key, sudo) and step 4 run
+#   make catch-up-lab2    ~/m4 = lab2/solution, tagged lab2; the same, then web.yml
 #
-# The nodes must be up (make -C lab0 up); they are not reset.
+# The nodes must be up (make -C lab0 up); they are not reset. Each target
+# replays the whole chain from the bootstrap, so it works on blank nodes too.
 
 M4            ?= $(HOME)/m4
 SSH_KEY       ?= $(HOME)/.ssh/id_ed25519
@@ -16,18 +18,25 @@ ROOT_PASSWORD  = redhat
 # $(call solution,<dir>,<tag>): ~/m4 = <dir>, one commit, a tag.
 define solution
 	test ! -e $(M4) || mv $(M4) $(M4).$$(date +%Y%m%d-%H%M%S)
-	cp -a $(1) $(M4)
+	cp -r $(1) $(M4)
 	cd $(M4) && git init -q \
 	  && { git config user.email >/dev/null || git config user.email m4@localhost; } \
 	  && { git config user.name >/dev/null || git config user.name m4; } \
 	  && git add -A && git commit -qm "$(2) (catch-up)" && git tag $(2)
 endef
 
+# Labs 1 → N: bootstrap with root's password, then each lab's playbooks.
+BOOTSTRAP = ./bootstrap.sh -e ansible_password=$(ROOT_PASSWORD) && ./adhoc.sh
+
 $(SSH_KEY):
 	ssh-keygen -q -t ed25519 -N '' -f $@
 
 catch-up-lab1: $(SSH_KEY)
 	$(call solution,lab1/solution,lab1)
-	cd $(M4) && ./bootstrap.sh -e ansible_password=$(ROOT_PASSWORD) && ./adhoc.sh
+	cd $(M4) && $(BOOTSTRAP)
 
-.PHONY: catch-up-lab1
+catch-up-lab2: $(SSH_KEY)
+	$(call solution,lab2/solution,lab2)
+	cd $(M4) && $(BOOTSTRAP) && ansible-playbook web.yml
+
+.PHONY: catch-up-lab1 catch-up-lab2
