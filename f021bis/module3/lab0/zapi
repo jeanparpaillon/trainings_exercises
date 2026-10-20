@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# One call to the Zabbix API as you (~/.zabbix/user.env), the result on stdout:
+#
+#   lab0/zapi <method> [params]       params: JSON, default {}; - reads stdin
+#
+#   lab0/zapi apiinfo.version
+#   lab0/zapi proxy.get '{"output": ["name", "lastaccess", "version"]}'
+#   lab0/zapi host.get '{"output": ["host"], "groupids": …}' | jq .
+#
+# What it does, so that you could do it with curl alone: user.login with
+# your name and password returns a token; the call itself is a JSON-RPC POST
+# with `Authorization: Bearer <token>`; then user.logout. The password and
+# the token never appear on a command line (ps): jq reads the password from
+# the environment, curl the header from a file descriptor.
+set -euo pipefail
+
+[ -n "${ZBX_API:-}" ] || . ~/.zabbix/user.env
+method=${1:?usage: zapi <method> [params json]}
+params=${2:-'{}'}
+[ "$params" = - ] && params=$(cat)
+
+TOKEN=
+call() {     # call <method> <params json>
+  local out
+  out=$(P=$2 jq -nc --arg m "$1" '{jsonrpc: "2.0", method: $m, params: (env.P | fromjson), id: 1}' \
+    | curl -fsS "$ZBX_API" -H 'Content-Type: application/json-rpc' \
+        -H @<([ -z "$TOKEN" ] || printf 'Authorization: Bearer %s\n' "$TOKEN") \
+        --data-binary @-)
+  if jq -e 'has("error")' <<<"$out" >/dev/null; then
+    echo "$1: $(jq -r '.error | "\(.message) \(.data)"' <<<"$out")" >&2
+    return 1
+  fi
+  jq -c .result <<<"$out"
+}
+
+# apiinfo.version is the one method that refuses a token.
+if [ "$method" = apiinfo.version ]; then
+  call "$method" '[]' | jq -r .
+  exit
+fi
+
+TOKEN=$(call user.login "$(PW=$ZBX_PASSWORD jq -nc --arg u "$ZBX_USER" '{username: $u, password: env.PW}')" | jq -r .)
+trap 'call user.logout "[]" >/dev/null || true' EXIT
+call "$method" "$params"

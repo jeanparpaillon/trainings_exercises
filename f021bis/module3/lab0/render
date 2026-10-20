@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# lab0/render <file>: the file on stdout, every ${VAR} replaced by the value
+# of VAR in the environment; a ${VAR} that is not set is left as it is.
+# What envsubst does, which the console image does not have (gettext-base);
+# perl is in every Ubuntu image.
+#
+# The solutions (labN/solution/) use ${ZBX_USER}, ${ZBX_SERVER}, ${CLUSTER},
+# ${ZABBIX_VERSION}, and ${CP_IP} / ${WORKER_IP} for the nodes' addresses.
+exec perl -pe 's/\$\{(\w+)\}/exists $ENV{$1} ? $ENV{$1} : $&/ge' "$@"

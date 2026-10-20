@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# lab0/import <export.yaml>…: import host exports (Data collection → Hosts →
+# Export, or configuration.export) as you, ~/.zabbix/user.env.
+#
+# Not a plain configuration.import: as a tenant you only READ the shipped
+# templates, and the import refuses a host linked to a template you cannot
+# write — "Template "Linux by Zabbix agent" for host "…" does not exist" —
+# where host.create and host.massadd accept it. So: each host's templates
+# are taken out of the file, the rest is imported, then the templates are
+# linked with host.massadd.
+#
+# Relies on the layout of a 7.0 export: a host's keys indented by 6
+# spaces under `  hosts:`, its templates as `        - name: …` under
+# `      templates:`.
+set -euo pipefail
+
+here=$(cd "$(dirname "$0")" && pwd)
+[ $# -gt 0 ] || { echo "usage: lab0/import <export.yaml>…" >&2; exit 2; }
+
+for f in "$@"; do
+  # host<TAB>template, one line per link.
+  links=$(awk '
+    /^    - host: /           { host = $3; gsub(/\x27/, "", host); next }
+    /^      templates:$/      { in_t = 1; next }
+    in_t && /^        - name: / { t = substr($0, index($0, "name: ") + 6); gsub(/^\x27|\x27$/, "", t); print host "\t" t; next }
+    in_t && !/^        /      { in_t = 0 }
+  ' "$f")
+  stripped=$(awk '
+    /^      templates:$/ { skip = 1; next }
+    skip && /^        / { next }
+    { skip = 0; print }
+  ' "$f")
+  P=$stripped jq -nc '{format: "yaml", source: env.P,
+      rules: {hosts: {createMissing: true, updateExisting: true}}}' \
+    | "$here/zapi" configuration.import - >/dev/null
+  echo "imported $f"
+  [ -n "$links" ] || continue
+  while IFS=$'\t' read -r host tpl; do
+    hid=$("$here/zapi" host.get "$(jq -nc --arg h "$host" '{output: ["hostid"], filter: {host: [$h]}}')" | jq -r '.[0].hostid')
+    tid=$("$here/zapi" template.get "$(jq -nc --arg t "$tpl" '{output: ["templateid"], filter: {host: [$t]}}')" | jq -r '.[0].templateid // empty')
+    [ -n "$tid" ] || { echo "  $host: no template \"$tpl\" on the server" >&2; exit 1; }
+    "$here/zapi" host.massadd "$(jq -nc --arg h "$hid" --arg t "$tid" '{hosts: [{hostid: $h}], templates: [{templateid: $t}]}')" >/dev/null
+    echo "  $host: linked to \"$tpl\""
+  done <<<"$links"
+done

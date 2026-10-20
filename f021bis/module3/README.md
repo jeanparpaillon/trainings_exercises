@@ -5,11 +5,14 @@ are in `../../../trainings/f021bis/slides/module3.md`; every lab here names
 the slides it belongs to, and the slides point back with
 `📖 module3/README.md — Lab N`.
 
-> **Status: specification.** This README describes what each lab must
-> contain and check. **Nothing is written or run yet**: no step file, no
-> `lab0/`, no trainer script. Facts about the Zabbix Helm chart and the
-> Kubernetes templates shipped with 7.0 are from their documentation, not
-> from a run, and are marked **(to validate)** where a step depends on them.
+> **Status: lab 1 written**, with `lab0/`, `versions.env` and `make
+> catch-up-lab1`, and run end to end on a laptop (2026-10-20) against the
+> room's Zabbix deployed locally — not yet on the server, which was down:
+> what that run did not cover is listed in [`lab1/README.md`](lab1/README.md#what-was-found-on-a-local-run).
+> Labs 2 to 4 are still a **specification**: facts about the Kubernetes
+> templates shipped with 7.0 are from their documentation or read off a
+> server, not from a run, and are marked **(to validate)** where a step
+> depends on them.
 
 | | Lab | Session | ~ |
 | --- | --- | --- | --- |
@@ -42,7 +45,7 @@ in their own console, from lab 1 to lab 4, monitored by the room's Zabbix server
   control plane) and watches objects appear and disappear;
 - **lab 3** adds what the templates do not cover: an application's
   `/metrics`, in a template of their own, exported to Git;
-- **lab 4** alerts on all of it, builds the cluster dashboard, then a
+- **lab 4** alerts on all of it, builds the cluster dashboard, then
   two faults break `mon`, one in the control layer (a node) and one in the
   workload (HTTP 500s), and the trainee finds them **from Zabbix only**.
 
@@ -143,11 +146,24 @@ for the demos.
   check that does not need the UI (`kubectl`, `zabbix_get` from the proxy
   pod, the API with `curl`) so that a broken UI is not a dead end.
 - **Zabbix configuration is code at the end of each lab**: the trainee exports
-  its hosts and templates as YAML (*Export*, or `configuration.export` with
-  `curl`) into `~/m3/`, a Git repo from lab 1 on, tag `lab1`…`lab4`. The
-  catch-up targets import those exports back (`configuration.import`); they
-  are also the solutions (`labN/solution/`, YAML with `<name>` replaced by
-  `${ZBX_USER}`, `envsubst` before import).
+  its hosts and templates as YAML (`configuration.export` through
+  `lab0/zapi`; the UI's *Export* downloads to the laptop, not the console)
+  into `~/m3/`, a Git repo from lab 1 on, tag `lab1`…`lab4`. The catch-up
+  targets import those exports back; they are also the solutions
+  (`labN/solution/`, YAML with `${ZBX_USER}`, `${CLUSTER}`, `${CP_IP}`… in
+  place of the trainee's values, filled in by `lab0/render`: the console
+  has no `envsubst`). **A tenant cannot `configuration.import` a host linked
+  to a shipped template** (it only reads them: `Template "…" for host "…"
+  does not exist`); `lab0/import` imports without the links and adds them
+  with `host.massadd`, which is allowed. Templates of their own (lab 3)
+  are in their template group, which they write.
+- **The API from the console**: `lab0/zapi <method> [params]` (login,
+  call, logout), on `ZBX_API` = the frontend's Service,
+  `http://zabbix-web.zabbix.svc:8080/` — not the public URL, whose host name
+  resolves to `127.0.1.1` in every container of the server **(to validate
+  from a console)**. The trainees' role (*Admin*) has **no
+  *Administration* menu**: proxies are read with `proxy.get`, the trainer
+  shows *Administration → Proxies*.
 - **Data takes time.** Zabbix updates are not instant: discovery runs every
   hour by default, items every minute. Step files say which intervals to
   lower for the lab (on the host's macros or with *Execute now*), and how
@@ -161,31 +177,35 @@ for the demos.
   `kubectl config current-context` before anything destructive.
 
 **Catch-up** (from `module3/`): `make catch-up-lab1`, `-lab2`, `-lab3`
-recreate `mon` from nothing (cluster, chart with the trainee's PSK, podinfo
-from lab 3 on), delete the trainee's hosts and templates on the server and
-import `labN/solution/` (~5 min, **to measure**). Keep them in sync when an
-end state changes.
+create `mon` if it is missing (cluster, images, chart with the trainee's
+PSK, podinfo from lab 3 on), replace `~/m3` by `labN/solution/` rendered
+for the trainee and their nodes' current IPs, delete the hosts of host
+group `<name>` on the server and import `~/m3/hosts/` with `lab0/import`.
+`catch-up-lab1` is written: ~1 min 10 s from no cluster, ~50 s on an
+existing one (laptop). The pieces are targets (`mon`, `m3 LAB=…`, `chart`,
+`hosts`) for the next labs to reuse. Keep them in sync when an end state
+changes.
 
 ## Prerequisites
 
 | Tool | Where |
 | --- | --- |
 | `kubectl`, `kind`, `helm` (v4), `docker`, `curl`, `git` | console image |
-| `jq`, `envsubst` | console image **(to check)**; else `lab0` puts `jq` into `~/bin` |
-| `zabbix_get` | in the proxy image (`kubectl exec` into the proxy pod) **(to validate)**; not installed in the console |
-| Zabbix Helm chart | `lab0 chart`: the `.tgz` at `ZABBIX_CHART_VERSION` into `lab0/charts/`, installed from the file (no network dependency on the day) |
-| images | `lab0 pull`: proxy, agent2, kube-state-metrics, podinfo, `KIND_NODE`, into the console's Docker, then `kind load` in lab 1 |
+| `jq`, `nc`, `perl` | console image (`jq`, `netcat-openbsd` in its Dockerfile; `perl` in every Ubuntu image). No `envsubst`: `lab0/render` |
+| `zabbix_get` | in the proxy image (`kubectl exec` into the proxy pod); not installed in the console |
+| Zabbix Helm chart | `lab0 chart`: the `.tgz` at `ZABBIX_CHART_VERSION` into `lab0/charts/` (git-ignored), installed from the file (no network dependency on the day) |
+| images | `lab0 pull`: proxy, agent2, kube-state-metrics, podinfo, `KIND_NODE`, into the console's Docker, single platform; `lab0 load` in lab 1 (`kind load image-archive`: `kind load docker-image` fails with the containerd image store) |
 
 ### Versions
 
-All in `versions.env` (to write; same format as modules 1 and 2):
+All in [`versions.env`](versions.env) (same format as modules 1 and 2):
 
 | Variable | Value | Notes |
 | --- | --- | --- |
 | `KIND_NODE` | module 1's `KIND_NODE_TO` (v1.37.0) | already pulled in every console |
 | `ZABBIX_VERSION` | `7.0.31` | **must match the server** (`../shared-cluster/zabbix/kustomization.yaml`): same major for the proxy to be accepted; same tag for the agents, to keep one version in the room |
-| `ZABBIX_CHART_VERSION` | TODO | official chart `zabbix-helm-chrt`, repository `https://cdn.zabbix.com/zabbix/integrations/kubernetes-helm/7.0` **(to validate: name, repository, the version that matches 7.0.31's templates)** |
-| `KSM_VERSION` | the chart's dependency | kube-state-metrics; note its version, the cluster state template relies on its metric names |
+| `ZABBIX_CHART`, `ZABBIX_CHART_VERSION` | `zabbix-helm-chart` `1.3.4` | official chart, repository `ZABBIX_CHART_REPO` = `https://cdn.zabbix.com/zabbix/integrations/kubernetes-helm/7.0`; appVersion 7.0.17, image tags overridden. The older name `zabbix-helm-chrt` stops at 1.2.4. Release `zabbix` → `zabbix-zabbix-helm-chart-*`, the endpoint names the 7.0 templates default to |
+| `KSM_VERSION` | `v2.9.2` | the chart's dependency (kube-state-metrics chart 5.7.0); the cluster state template relies on its metric names. Not run yet: it crash-looped on the laptop for lack of inotify instances, see lab 1 |
 | `PODINFO_CHART_VERSION` | `6.15.0` | module 2's; podinfo exposes Prometheus metrics on `:9898/metrics` |
 
 ## Lab 1 — Connect a cluster to Zabbix (session 1)
@@ -201,53 +221,42 @@ to Zabbix*. 65 min, then a 10 min debrief.
 | 4 | the nodes as hosts, by hand | 20 min |
 | 5 | export, commit | 5 min |
 
-Start: `make -C lab0 check` green (the trainer ran `pull-consoles` and
-`make zabbix-users`).
+**Written**: [`lab1/`](lab1/) — the step files are the reference; this is
+their outline. Start: `make -C lab0 credentials` then `make -C lab0 check`
+green (the trainer ran `make zabbix-users` and `make -C lab0
+pull-consoles`).
 
-1. **step1-cluster** — given `lab1/kind.yaml` (1 control plane, untainted, +
-   1 worker, `KIND_NODE`); `make -C lab0 credentials`, then
-   `kind create cluster --name "$CLUSTER" --config …`; `kind load
-   docker-image` the pulled images;
-   check `~/.zabbix/user.env`, log in to the UI as `<name>`, see the empty
-   host group. `~/m3`, `git init`. Question: what can user `<name>` see of
-   the other trainees, what can it change, and why is that enough isolation
-   for a lab and not for production (one server, one database, one Admin)?
-   Why is the cluster not just `mon` (lab 2: host names are unique on the
-   server, and discovered hosts are named after the nodes)?
-2. **step2-chart** — given `lab1/step2-chart/values.yaml`, to complete:
-   proxy `ZBX_HOSTNAME=$ZBX_USER`, `ZBX_SERVER_HOST=195.35.2.222`, active
-   mode, PSK from a Secret created from `~/.zabbix/user.psk`
-   (`ZBX_TLSCONNECT=psk`, `ZBX_TLSPSKIDENTITY`, `ZBX_TLSPSKFILE`); image
-   tags = `ZABBIX_VERSION`; agent2 `hostNetwork`. `helm install zabbix
-   lab0/charts/zabbix-helm-chrt-*.tgz -n monitoring --create-namespace -f …`.
-   Check: `kubectl -n monitoring get pods -o wide` (proxy, one agent per
-   node, kube-state-metrics), proxy logs.
-   **(to validate)**: the chart's value names for the proxy's TLS settings
-   and whether it mounts a PSK Secret; if not, an `extraVolumes` in the
-   values. Expected traps, to keep in the step file once seen: the host
-   name instead of the IP, a PSK identity that does not match, a proxy
-   image of another major.
-3. **step3-proxy** — *Administration → Proxies*: `<name>` *last seen* a few
-   seconds ago, version shown and compatible. Then on purpose: scale the
-   proxy to 0 for two minutes and back; what did the server show, what did
-   the proxy keep (`ProxyOfflineBuffer`, `ProxyLocalBuffer`)? Question: why
-   a proxy per cluster rather than agents talking to the server directly
-   (one outbound port, buffering, the server never needs a route into the
-   cluster)?
-4. **step4-nodes** — create two hosts by hand, named after the nodes,
-   `$CLUSTER-control-plane` and `$CLUSTER-worker`, in group `<name>`, *Monitored by proxy* `<name>`, agent
-   interface = the node's `InternalIP` (`kubectl get nodes -o wide`), port
-   10050, template *Linux by Zabbix agent*. Wait for data (*Latest data*),
-   check one value from the proxy pod: `zabbix_get -s <node IP> -k
-   system.uptime`. Compare memory, CPU count and uptime with `free`,
-   `nproc` in the console. Questions, for the debrief: whose kernel, memory
-   and uptime are these (the server's: a kind node is a container)? On their
-   production nodes, what does the agent DaemonSet see that a package on the
-   host would not, and the reverse? How would the module 2 role install the
-   agent as a package instead?
-5. **step5-export** — export the two hosts as YAML into `~/m3/hosts/`,
-   commit, tag `lab1`. Question: what in the export depends on this cluster
-   (IPs), and would it survive `kind delete`? (No — lab 2's answer.)
+1. **step1-cluster** — `make -C lab0 credentials`, `kind create cluster
+   --name "$CLUSTER" --config lab1/kind.yaml`, `make -C lab0 load`; log in
+   to the UI as `<name>`, see the empty host group and the others';
+   `git init ~/m3`. Questions: what `<name>` sees and changes of the
+   others, why enough for a lab and not for production; why `mon-<name>`.
+2. **step2-chart** — complete `lab1/step2-chart/values.yaml` into
+   `~/m3/values.yaml` (image tags, `ZBX_HOSTNAME`, `ZBX_SERVER_HOST`,
+   `ZBX_TLSCONNECT=psk`, `ZBX_TLSPSKIDENTITY`, `ZBX_TLSPSKFILE=psk`); Secret
+   `zabbix-proxy-psk` from `~/.zabbix/user.psk`, mounted by the given
+   `extraVolumes` (the chart's `env` takes literal values only); `helm
+   install zabbix lab0/charts/zabbix-helm-chart-1.3.4.tgz -n monitoring`.
+   The traps, with the log lines seen on the dry run, are in the step file.
+3. **step3-proxy** — the proxy's `state`, `lastaccess`, `version`,
+   `compatibility` **through the API** (`lab0/zapi proxy.get`): the Admin
+   role has no *Administration → Proxies*. Scale the proxy to 0 for two
+   minutes: offline by 90 s, back in ~15 s with a **new** SQLite database
+   (`emptyDir`) — nothing collected, nothing buffered. Question: why a proxy
+   per cluster; the buffer settings (defaults apply: the entrypoint drops
+   the image's `ProxyBufferMode=hybrid`).
+4. **step4-nodes** — hosts `$CLUSTER-control-plane` and `$CLUSTER-worker` by
+   hand (group `<name>`, monitored by proxy `<name>`, agent interface =
+   `InternalIP`:10050, *Linux by Zabbix agent*); `zabbix_get` from the
+   proxy pod; compare with `free`, `nproc`, `/proc/uptime`. Then **the
+   buffer**, moved here from step 3 (there was no data to buffer there):
+   `lab1/step4-nodes/cut.yaml`, a NetworkPolicy cutting only proxy →
+   server (kindnet enforces it), two minutes, lifted: no gap in the
+   history. Questions as before (whose kernel; DaemonSet vs package;
+   module 2's role).
+5. **step5-export** — `configuration.export` into `~/m3/hosts/`, commit,
+   tag `lab1`. Questions: the IPs (the nodes swapped them on re-creation),
+   and why the tenant cannot import its own export back.
 
 **End state** (start of lab 2): `mon` with the chart in `monitoring`; proxy
 `<name>` connected; two hand-made node hosts collecting data; `~/m3` tagged
@@ -490,15 +499,19 @@ filter) is the peak — watch *Zabbix server health* during the dry run with 3
 trainees and the trainer, and the PostgreSQL volume. Lower the proxies' discovery intervals in
 the step files only as much as the room needs.
 
-## Files to write
+## Files
 
 ```
 module3/
   README.md                this file
-  versions.env             pinned versions
-  Makefile                 catch-up-lab1, -lab2, -lab3
-  lab0/                    Makefile: chart, pull, pull-consoles, credentials, check
-  lab1/                    README.md, kind.yaml, step1…5/ (step2-chart/values.yaml), solution/
+  versions.env             pinned versions                                written
+  Makefile                 catch-up-lab1 (written), -lab2, -lab3
+  lab0/                    Makefile: chart, pull, load, credentials, check,
+                           pull-consoles; zapi (the API as the trainee),
+                           import (host exports, see Conventions), render,
+                           user-env.jq                                    written
+  lab1/                    README.md, kind.yaml, step1…5/ (step2-chart/values.yaml,
+                           step4-nodes/cut.yaml), solution/               written
   lab2/                    README.md, step1…6/ (step4-churn/), solution/
   lab3/                    README.md, load.yaml, step1…5/, solution/
   lab4/                    README.md, break (control | workload), reset,

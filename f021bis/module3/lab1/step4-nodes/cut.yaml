@@ -1,0 +1,22 @@
+# Lab 1 step 4: cut the link between your proxy and the server, and only that
+# link — the proxy still reaches the agents, so it keeps collecting.
+#
+#   sed "s/SERVER_IP/${ZBX_SERVER%:*}/" lab1/step4-nodes/cut.yaml | kubectl apply -f -
+#   kubectl -n monitoring delete networkpolicy cut-server      # two minutes later
+#
+# kind's CNI (kindnet) enforces NetworkPolicies since kind v0.24.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cut-server
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      name: zabbix-zabbix-helm-chart-proxy
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [SERVER_IP/32]

@@ -1,0 +1,17 @@
+zabbix_export:
+  version: '7.0'
+  hosts:
+    - host: ${CLUSTER}-control-plane
+      name: ${CLUSTER}-control-plane
+      monitored_by: PROXY
+      proxy:
+        name: ${ZBX_USER}
+      templates:
+        - name: 'Linux by Zabbix agent'
+      groups:
+        - name: ${ZBX_USER}
+      interfaces:
+        - ip: ${CP_IP}
+          interface_ref: if1
+      inventory_mode: DISABLED
+

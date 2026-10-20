@@ -1,0 +1,20 @@
+# Module 3 — `mon-<name>`: one control plane, one worker, labs 1 to 4.
+#
+#   kind create cluster --name "$CLUSTER" --config lab1/kind.yaml --image "$KIND_NODE"
+#
+# Named after you, not just `mon`: lab 2's discovery names hosts after the
+# nodes, and host names are unique on the room's server.
+#
+# No control-plane taint: podinfo (lab 3) and the load pod fit on either node,
+# and lab 4's `break control` pauses the worker. A lab compromise — in
+# production, keep workloads off the control plane.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          taints: []
+  - role: worker

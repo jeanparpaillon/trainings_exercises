@@ -1,0 +1,51 @@
+# Values of the Zabbix chart (ZABBIX_CHART at ZABBIX_CHART_VERSION) for your
+# cluster. Copy into ~/m3/values.yaml, complete every TODO from
+# ~/.zabbix/user.env and versions.env, then (step2-chart/README.md):
+#
+#   helm install zabbix lab0/charts/$ZABBIX_CHART-$ZABBIX_CHART_VERSION.tgz \
+#     -n monitoring --create-namespace -f ~/m3/values.yaml
+#
+# Values only, nothing secret: the PSK comes from Secret zabbix-proxy-psk,
+# created from ~/.zabbix/user.psk. This file goes into Git.
+
+zabbixProxy:
+  image:
+    tag: alpine-TODO              # ZABBIX_VERSION: the server's major, 7.0
+  # A list replaces the chart's list as a whole: everything the chart set and
+  # that you still want must be repeated here (ZBX_PROXYCONFIGFREQUENCY…).
+  env:
+    - name: ZBX_PROXYMODE         # 0 = active: the proxy opens the connection
+      value: 0
+    - name: ZBX_HOSTNAME          # the proxy's name, as declared on the server
+      value: TODO
+    - name: ZBX_SERVER_HOST       # <IP>:<port> of the server's trapper
+      value: TODO
+    - name: ZBX_TLSCONNECT        # how the proxy connects to the server
+      value: TODO
+    - name: ZBX_TLSPSKIDENTITY
+      value: TODO
+    - name: ZBX_TLSPSKFILE        # a name relative to /var/lib/zabbix/enc/,
+      value: TODO                 # where the Secret is mounted (below)
+    - name: ZBX_PROXYCONFIGFREQUENCY   # s between two configuration syncs
+      value: 10
+    - name: ZBX_CACHESIZE
+      value: 128M
+    - name: ZBX_DEBUGLEVEL
+      value: 3
+  # The chart's `env` only takes literal values (no valueFrom): the PSK is
+  # read from a file, a Secret mounted where the image looks for TLS files.
+  extraVolumes:
+    - name: psk
+      secret:
+        secretName: zabbix-proxy-psk
+  extraVolumeMounts:
+    - name: psk
+      mountPath: /var/lib/zabbix/enc
+      readOnly: true
+
+zabbixAgent:
+  image:
+    tag: alpine-TODO              # ZABBIX_VERSION
+  # The agent listens on the node's own address, <node IP>:10050: that is
+  # the interface of the hosts you create in step 4.
+  hostNetwork: true

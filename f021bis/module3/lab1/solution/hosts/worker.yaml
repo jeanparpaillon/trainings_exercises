@@ -1,0 +1,17 @@
+zabbix_export:
+  version: '7.0'
+  hosts:
+    - host: ${CLUSTER}-worker
+      name: ${CLUSTER}-worker
+      monitored_by: PROXY
+      proxy:
+        name: ${ZBX_USER}
+      templates:
+        - name: 'Linux by Zabbix agent'
+      groups:
+        - name: ${ZBX_USER}
+      interfaces:
+        - ip: ${WORKER_IP}
+          interface_ref: if1
+      inventory_mode: DISABLED
+
