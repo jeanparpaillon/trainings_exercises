@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# lab4/reset: undoes both faults of lab4/break, whichever is applied — the
+# worker unpaused, the load pod back to lab3/load.yaml's mix. From module3/.
+set -euo pipefail
+
+[ -n "${CLUSTER:-}" ] || . ~/.zabbix/user.env
+here=$(cd "$(dirname "$0")" && pwd)
+k() { kubectl --context "kind-$CLUSTER" "$@"; }
+
+if [ "$(docker inspect -f '{{.State.Paused}}' "$CLUSTER-worker")" = true ]; then
+  docker unpause "$CLUSTER-worker" >/dev/null
+  echo "worker unpaused"
+fi
+k apply -f "$here/../lab3/load.yaml" >/dev/null
+k wait --for=condition=Ready node --all --timeout=120s >/dev/null
+k -n podinfo rollout status deploy/load --timeout=120s >/dev/null
+echo "reset at $(date +%T): nodes Ready, load back to its mix"

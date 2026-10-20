@@ -1,0 +1,13 @@
+zabbix_export:
+  version: '7.0'
+  hosts:
+    - host: '${ZBX_USER} podinfo'
+      name: '${ZBX_USER} podinfo'
+      monitored_by: PROXY
+      proxy:
+        name: ${ZBX_USER}
+      templates:
+        - name: '${ZBX_USER} podinfo by HTTP'
+      groups:
+        - name: ${ZBX_USER}
+      inventory_mode: DISABLED

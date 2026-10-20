@@ -5,18 +5,18 @@ are in `../../../trainings/f021bis/slides/module3.md`; every lab here names
 the slides it belongs to, and the slides point back with
 `📖 module3/README.md — Lab N`.
 
-> **Status: labs 1, 2 and 3 written and validated on the server**
+> **Status: labs 1 to 4 written and validated on the server**
 > (2026-10-20, `console-jean`), with `lab0/`, `versions.env`, `make
-> catch-up-lab1`, `-lab2` and `-lab3`; findings in each lab's README. One
+> catch-up-lab1` to `-lab4`; findings in each lab's README. One
 > open decision: tenants cannot delete their parent hosts once discovery
 > has run ([`lab2/README.md`](lab2/README.md#validated-on-the-server)).
-> Lab 3 departs from its specification where the run disagreed with it
-> (one podinfo replica, p95 computed in Zabbix, another kube-state-metrics
-> metric: [`lab3/README.md`](lab3/README.md#validated-on-the-server)).
-> Lab 4 is still a **specification**: facts about the Kubernetes
-> templates shipped with 7.0 are from their documentation or read off a
-> server, not from a run, and are marked **(to validate)** where a step
-> depends on them.
+> Labs 3 and 4 depart from their specification where the run disagreed
+> with it (lab 3: one podinfo replica, p95 computed in Zabbix, another
+> kube-state-metrics metric; lab 4: the proxy moved off the worker before
+> the drill, *no data* not on the master item):
+> [`lab3/README.md`](lab3/README.md#validated-on-the-server),
+> [`lab4/README.md`](lab4/README.md#validated-on-the-server). The step
+> files give UI paths; the runs went through the API.
 
 | | Lab | Session | ~ |
 | --- | --- | --- | --- |
@@ -93,6 +93,7 @@ or the global templates:
 | template group | `<name>` | trainer |
 | user group | `<name>`: read-write on both groups above, read on `Templates/*` | trainer |
 | user | `<name>`, role *Admin* (not *Super admin*), in user group `<name>` | trainer |
+| media type | `Lab webhook`, one for the room: a webhook that logs the message and returns OK (lab 4); a media of it on each user | trainer |
 | the Kubernetes and Linux templates | as shipped with 7.0 (`Templates/Applications`, `Templates/Operating systems`, …) | imported by the server at first start; linked by the trainees, never edited |
 
 **Everyone sees everyone's hosts**: each user group reads the other
@@ -442,55 +443,46 @@ alerts to Zabbix*, *Lab 4 — Alert, dashboard, incident*. 55 min.
 | 4 | incident drill | 15 min |
 | 5 | incident note, export | 5 min |
 
-1. **step1-triggers** — look first at what the templates already define
-   (node not ready, pods not ready, replicas unavailable…) and their
-   severities. Add, in `<name> podinfo by HTTP`: error rate above a threshold for 2
-   minutes (`min(…,2m)`, not `last()`), no data from the master item for 3
-   minutes. Add a **dependency**: podinfo's triggers depend on the node
-   *not ready* trigger. Question: on their cluster, which of the shipped
-   triggers would page at night, which should not, and where do they
-   change that without editing a shipped template (host-level macros,
-   overrides)?
-2. **step2-action** — an action on problems of host group `<name>` *or* of
-   their discovered hosts (condition *Host*, which they can read: an action
-   on `Applications` would fire for everyone) **(to validate: an Admin can
-   use hosts it only reads in a condition)**,
-   severity *Average* and above, sending to user `<name>` through media
-   type `Lab webhook` **(to decide: what the trainer sets up — a webhook
-   to an echo receiver in namespace `zabbix` whose page shows each
-   trainee's messages, or the frontend's notifications only)**. Then a maintenance
-   period on host group `<name>`, 15 min (the discovered `$CLUSTER-worker`
-   is read-only to them, and a maintenance needs write — checked: the API
-   refuses it; the node problems that matter come from the parent host
-   `<name> mon nodes`, which is theirs **(to validate)**), *with data collection*: what do the
-   problems and the action do while it is on? Question: which of module 1's
-   and module 2's operations (drain, `upgrade-cluster.yml`) should open a
-   maintenance first, and who opens it — a human, or the playbook through
-   the API?
-3. **step3-dashboard** — a dashboard `<name> mon` (owned by `<name>`):
-   problems of group `<name>`, node CPU and memory, pods not ready, podinfo
-   requests and errors per second, proxy queue. Question: what is on the
-   first screen the on-call opens?
-4. **step4-drill** — two faults, one after the other, each applied by
-   `lab4/break <fault>` (to write) and undone by `lab4/reset`. Before each:
-   write down which problems should fire, in what order, and which the
-   step 1 dependency should hide. Then only the Zabbix UI until the cause is
-   named; fix with `docker` / `kubectl`; time to detect written down.
+**Written**: [`lab4/`](lab4/) — the step files are the reference; this is
+their outline.
 
-   | Fault | `lab4/break …` | Expected in Zabbix | Fix |
-   | --- | --- | --- | --- |
-   | control | `control`: `docker pause $CLUSTER-worker` (never `stop`: module 1) | node not ready, on the discovered node host and on `<name> mon nodes`; the agent unreachable; podinfo's triggers **suppressed** by the dependency, though its pods on the worker are gone | `docker unpause $CLUSTER-worker` |
-   | workload | `workload`: the load pod switched to `/status/500` only | the lab 3 error-rate trigger on `<name> podinfo`, after its 2 minutes; nothing on the nodes or the cluster state | `lab4/reset` (load back to its mix) |
+1. **step1-triggers** — the shipped triggers by severity: *node not
+   ready* is a **Warning** (on `<name> mon nodes`), *Pod is not healthy*
+   High. In `<name> podinfo by HTTP`: macro `{$PODINFO.ERRORS.MAX}` = 1;
+   *5xx above … for 2 min* (`min(…,2m)`, High), *no data for 3 min* on
+   `podinfo.started` — **not** the master, whose history is not stored:
+   `nodata()` on it stays *unknown* —, *rollout stuck*. On host `<name>
+   podinfo`, the three depend on *Node [mon-<name>-worker] … not in Ready
+   state* (host level: not exported; `lab0/depend`).
+2. **step2-action** — media type `Lab webhook`, from the trainer
+   (`bin/zabbix users`: a webhook that logs and returns OK; each tenant
+   user has a media of it). Action `<name> pages`: `(A or B or C) and (D
+   or E)` — host group `<name>`, the two discovered node hosts (read-only
+   is enough), severity ≥ Average, or a name containing *Is not in Ready
+   state*. A problem on demand: host macro `{$PODINFO.ERRORS.MAX}` = 0.1
+   (opens in 30 s). Maintenance on group `<name>`, with data collection:
+   problem suppressed, operations paused, sent ~30 s after it ends; one on
+   a discovered host is refused.
+3. **step3-dashboard** — host `<name> proxy` (*Zabbix proxy health*,
+   monitored by the proxy itself), dashboard `<name> mon`: problems (group;
+   node hosts), node CPU, memory, ready, podinfo requests/5xx, p95, proxy
+   queue. `lab4/solution/dashboard.json` + `lab0/dashboard` if short of
+   time.
+4. **step4-drill** — first, the proxy and kube-state-metrics to the
+   control plane (`nodeSelector` in `~/m3/values.yaml`): after lab 3 they
+   may sit on the worker, and pausing it would blind Zabbix. Then
+   predictions, `lab4/break control` (`docker pause` the worker) and
+   `lab4/break workload` (load on `/status/500`), `lab4/reset`.
 
-   Questions: in the control fault, how long until the node was *not
-   ready* in Kubernetes, and in Zabbix? Did the dependency hold, or did
-   podinfo page as well? In the workload fault, which template saw it, and
-   would the shipped Kubernetes templates alone have seen anything (the
-   pods are *Running* and *Ready*)?
-5. **step5-note** — a five-line incident note in `~/m3/incidents/`
-   (detected by, time to detect, cause, fix, what to change in the
-   monitoring); apply that change (a trigger, a threshold, a dependency).
-   Export template, hosts and dashboard, commit, tag `lab4`.
+   | Fault | Kubernetes | Zabbix (dry run) |
+   | --- | --- | --- |
+   | control | `NotReady` 49–50 s | *node not ready* 60–88 s, sent; podinfo silent (dependency); node host: nothing; replicas mismatch Warnings ~5 min; podinfo's *no data* paged 1 s after the node recovered |
+   | workload | pods *Running*, *Ready* | *5xx above 1/s* at 101 s; nothing else |
+5. **step5-note** — five lines per fault in `~/m3/incidents/`; one change
+   applied (dry run: the action's operations from step 2, 2 min steps — a
+   1 min problem then sends nothing). Export template and proxy host, the
+   dashboard by names, the action as `action.get` JSON (ids: not
+   importable); commit, tag `lab4`.
 
 **End state**: the end of the module. `kind delete cluster --name "$CLUSTER"`;
 the trainer runs `make zabbix-users-delete` (shared-cluster).
@@ -517,17 +509,18 @@ the step files only as much as the room needs.
 module3/
   README.md                this file
   versions.env             pinned versions                                written
-  Makefile                 catch-up-lab1, -lab2, -lab3 (written)
+  Makefile                 catch-up-lab1 … -lab4 (written)
   lab0/                    Makefile: chart, pull, load, credentials, check,
                            pull-consoles; zapi (the API as the trainee),
                            import (host and template exports, see
-                           Conventions), render, user-env.jq              written
+                           Conventions), render, user-env.jq; depend
+                           (trigger dependencies), dashboard (from names) written
   lab1/                    README.md, kind.yaml, step1…5/ (step2-chart/values.yaml,
                            step4-nodes/cut.yaml), solution/               written
   lab2/                    README.md, step1…6/ (step4-churn/), solution/
   lab3/                    README.md, load.yaml, step1…5/ (step1-podinfo/values.yaml),
                            solution/ (templates/: ${UUID:…})              written
   lab4/                    README.md, break (control | workload), reset,
-                           step1…5/, solution/
-../shared-cluster/bin/zabbix   users [--delete] (written, tested locally)
+                           step1…5/, solution/ (dashboard.json)           written
+../shared-cluster/bin/zabbix   users [--delete], media type Lab webhook   written
 ```

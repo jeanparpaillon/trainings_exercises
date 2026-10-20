@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# lab4/break control|workload: one fault in mon-<name>, for the drill (lab 4
+# step 4). From module3/, after `source ~/.zabbix/user.env`. Prints the time
+# it was applied: your time to detect starts there. `lab4/reset` undoes both.
+#
+#   control    the worker node paused (`docker pause`, never `stop`: a
+#              restarted kind node can come back with another IP, module 1).
+#              Its kubelet stops reporting; everything on it freezes.
+#   workload   the load pod asks only for /status/500: podinfo answers, its
+#              pod is Running and Ready, every request fails.
+set -euo pipefail
+
+[ -n "${CLUSTER:-}" ] || . ~/.zabbix/user.env
+k() { kubectl --context "kind-$CLUSTER" "$@"; }
+
+case ${1:-} in
+  control)
+    docker pause "$CLUSTER-worker" >/dev/null
+    ;;
+  workload)
+    k -n podinfo set env deploy/load PATHS=/status/500 >/dev/null
+    ;;
+  *)
+    echo "usage: lab4/break control|workload" >&2
+    exit 2
+    ;;
+esac
+echo "$1 fault applied at $(date +%T)"

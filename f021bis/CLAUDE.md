@@ -49,8 +49,12 @@ module3/README.md          Zabbix: spec of labs 1-4 (3 trainees, alone, one prox
                            hosts linked to shipped templates — lab0/import).
                            Template exports need per-trainee v4 uuids:
                            ${UUID:<seed>} in solutions, made by lab0/render
-module4/README.md          Ansible certification: spec of labs 1-5, lab0, exam
-                           (step files not written, nothing run yet)
+module4/README.md          Ansible certification: spec of labs 1-5, lab0, exam.
+                           lab0 written (Rocky 9 node image in the exam's initial
+                           state: root/redhat over SSH only; m4 network, fixed
+                           IPs; refuses to start beside module 2's same-named
+                           nodes) and run on a laptop, not on the server; step
+                           files and exam not written
 ```
 
 Bookinfo states are cumulative overlays: `bookinfo/` → `lab2/step3-install`

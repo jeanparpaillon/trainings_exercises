@@ -15,7 +15,7 @@ KUBECTL := kubectl --kubeconfig=$(KUBECONFIG_FILE) --context=$(NAME)
 
 # Bump the tag on every change to console/: kind-loaded images are never
 # re-pulled, a new tag is what rolls the consoles.
-CONSOLE_IMAGE    := f021bis-console:2
+CONSOLE_IMAGE    := f021bis-console:3
 TRAEFIK_VERSION  := 41.7.1
 HEADLAMP_VERSION := 0.46.0
 

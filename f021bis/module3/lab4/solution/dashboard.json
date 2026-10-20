@@ -1,0 +1,75 @@
+{
+  "name": "${ZBX_USER} mon",
+  "display_period": 30,
+  "auto_start": 1,
+  "pages": [
+    {
+      "widgets": [
+        {
+          "type": "problems", "name": "Problems: ${ZBX_USER}", "x": 0, "y": 0, "width": 36, "height": 5,
+          "fields": [
+            {"type": 2, "name": "groupids.0", "value": "group:${ZBX_USER}"},
+            {"type": 0, "name": "show_suppressed", "value": 1}
+          ]
+        },
+        {
+          "type": "problems", "name": "Problems: the nodes", "x": 36, "y": 0, "width": 36, "height": 5,
+          "fields": [
+            {"type": 3, "name": "hostids.0", "value": "host:${CLUSTER}-control-plane"},
+            {"type": 3, "name": "hostids.1", "value": "host:${CLUSTER}-worker"},
+            {"type": 0, "name": "show_suppressed", "value": 1}
+          ]
+        },
+        {
+          "type": "svggraph", "name": "Nodes: CPU utilization", "x": 0, "y": 5, "width": 24, "height": 5,
+          "fields": [
+            {"type": 1, "name": "ds.0.hosts.0", "value": "${CLUSTER}-*"},
+            {"type": 1, "name": "ds.0.items.0", "value": "CPU utilization"},
+            {"type": 1, "name": "ds.0.color", "value": "FF465C"}
+          ]
+        },
+        {
+          "type": "svggraph", "name": "Nodes: memory utilization", "x": 24, "y": 5, "width": 24, "height": 5,
+          "fields": [
+            {"type": 1, "name": "ds.0.hosts.0", "value": "${CLUSTER}-*"},
+            {"type": 1, "name": "ds.0.items.0", "value": "Memory utilization"},
+            {"type": 1, "name": "ds.0.color", "value": "0EC9AC"}
+          ]
+        },
+        {
+          "type": "svggraph", "name": "Nodes: ready", "x": 48, "y": 5, "width": 24, "height": 5,
+          "fields": [
+            {"type": 1, "name": "ds.0.hosts.0", "value": "${ZBX_USER} mon nodes"},
+            {"type": 1, "name": "ds.0.items.0", "value": "Node [*] Conditions: Ready"},
+            {"type": 1, "name": "ds.0.color", "value": "524BBC"}
+          ]
+        },
+        {
+          "type": "svggraph", "name": "podinfo: requests and 5xx per second", "x": 0, "y": 10, "width": 36, "height": 5,
+          "fields": [
+            {"type": 1, "name": "ds.0.hosts.0", "value": "${ZBX_USER} podinfo"},
+            {"type": 1, "name": "ds.0.items.0", "value": "podinfo: requests per second"},
+            {"type": 1, "name": "ds.0.color", "value": "0080FF"},
+            {"type": 1, "name": "ds.1.hosts.0", "value": "${ZBX_USER} podinfo"},
+            {"type": 1, "name": "ds.1.items.0", "value": "podinfo: 5xx per second"},
+            {"type": 1, "name": "ds.1.color", "value": "FF465C"}
+          ]
+        },
+        {
+          "type": "item", "name": "podinfo: p95", "x": 36, "y": 10, "width": 12, "height": 5,
+          "fields": [
+            {"type": 4, "name": "itemid.0", "value": "item:${ZBX_USER} podinfo|podinfo.latency.p95"}
+          ]
+        },
+        {
+          "type": "svggraph", "name": "Proxy ${ZBX_USER}: queue", "x": 48, "y": 10, "width": 24, "height": 5,
+          "fields": [
+            {"type": 1, "name": "ds.0.hosts.0", "value": "${ZBX_USER} proxy"},
+            {"type": 1, "name": "ds.0.items.0", "value": "Queue"},
+            {"type": 1, "name": "ds.0.color", "value": "FF8000"}
+          ]
+        }
+      ]
+    }
+  ]
+}

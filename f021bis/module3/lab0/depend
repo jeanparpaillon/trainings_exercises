@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# lab0/depend <host> <trigger name prefix> <other host> <other trigger name>
+#
+# Makes every trigger of <host> whose name starts with <prefix> depend on the
+# trigger of <other host> named <other trigger name> (as shown, macros
+# expanded), as you. Waits up to 5 min for that trigger: a discovered one
+# appears only after its discovery has run. Lab 4 step 1:
+#
+#   lab0/depend "$ZBX_USER podinfo" "podinfo: " "$ZBX_USER mon nodes" \
+#     "Kubernetes nodes: Node [$CLUSTER-worker] Conditions: Is not in Ready state"
+#
+# A dependency set on a host's inherited trigger is not in the host's
+# export: this is how the catch-up sets it again.
+set -euo pipefail
+
+here=$(cd "$(dirname "$0")" && pwd)
+z() { "$here/zapi" "$@"; }
+[ $# -eq 4 ] || { echo "usage: lab0/depend <host> <trigger prefix> <other host> <other trigger>" >&2; exit 2; }
+
+on=
+for _ in $(seq 30); do
+  on=$(z trigger.get "$(jq -nc --arg h "$3" '{output: ["triggerid", "description"], host: $h, expandDescription: true}')" \
+    | jq -r --arg d "$4" 'map(select(.description == $d))[0].triggerid // empty')
+  [ -z "$on" ] || break
+  sleep 10
+done
+[ -n "$on" ] || { echo "depend: no trigger \"$4\" on \"$3\"" >&2; exit 1; }
+
+z trigger.get "$(jq -nc --arg h "$1" '{output: ["triggerid", "description"], host: $h}')" \
+  | jq -r --arg p "$2" '.[] | select(.description | startswith($p)) | "\(.triggerid)\t\(.description)"' \
+  | while IFS=$'\t' read -r id name; do
+      z trigger.update "$(jq -nc --arg i "$id" --arg d "$on" '{triggerid: $i, dependencies: [{triggerid: $d}]}')" >/dev/null
+      echo "  $name <- $4"
+    done

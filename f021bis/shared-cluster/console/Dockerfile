@@ -19,7 +19,7 @@ RUN apt-get update \
       ca-certificates curl gnupg tini \
       bash-completion less vim nano jq git make openssh-client \
       iproute2 iputils-ping dnsutils netcat-openbsd \
-      python3 python3-pip python3-venv ansible \
+      python3 python3-pip python3-venv ansible sshpass \
  && rm -rf /var/lib/apt/lists/*
 
 # docker CLI (the daemon is the pod's dind sidecar) and kubectl, from their

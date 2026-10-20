@@ -1,0 +1,13 @@
+zabbix_export:
+  version: '7.0'
+  hosts:
+    - host: '${ZBX_USER} proxy'
+      name: '${ZBX_USER} proxy'
+      monitored_by: PROXY
+      proxy:
+        name: ${ZBX_USER}
+      templates:
+        - name: 'Zabbix proxy health'
+      groups:
+        - name: ${ZBX_USER}
+      inventory_mode: DISABLED

@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# lab0/dashboard <dashboard.json>: create a dashboard as you, from a file
+# that names its objects instead of giving their ids. A dashboard is not part
+# of configuration.export, and its widgets hold ids, which differ from one
+# server, and one trainee, to the next. In the file, the value of a widget
+# field of type
+#
+#   2 (host group)   is "group:<name>"
+#   3 (host)         is "host:<host name>"
+#   4 (item)         is "item:<host name>|<item key>"
+#
+# and is replaced by the id. A dashboard of yours with the same name is
+# deleted first. Render the file first (lab0/render) if it has ${…}.
+set -euo pipefail
+
+here=$(cd "$(dirname "$0")" && pwd)
+z() { "$here/zapi" "$@"; }
+f=${1:?usage: lab0/dashboard <dashboard.json>}
+
+# Every name the file refers to, resolved once.
+map='{}'
+while IFS= read -r ref; do
+  kind=${ref%%:*} name=${ref#*:}
+  case $kind in
+    group) id=$(z hostgroup.get "$(jq -nc --arg n "$name" '{output: ["groupid"], filter: {name: [$n]}}')" | jq -r '.[0].groupid // empty') ;;
+    host)  id=$(z host.get "$(jq -nc --arg n "$name" '{output: ["hostid"], filter: {host: [$n]}}')" | jq -r '.[0].hostid // empty') ;;
+    item)  id=$(z item.get "$(jq -nc --arg h "${name%%|*}" --arg k "${name#*|}" '{output: ["itemid"], host: $h, filter: {key_: [$k]}}')" | jq -r '.[0].itemid // empty') ;;
+  esac
+  [ -n "$id" ] || { echo "dashboard: no $kind \"$name\" on the server" >&2; exit 1; }
+  map=$(jq -c --arg r "$ref" --arg i "$id" '. + {($r): $i}' <<<"$map")
+done < <(jq -r '.pages[].widgets[].fields[] | select(.type == 2 or .type == 3 or .type == 4) | .value' "$f" | sort -u)
+
+dash=$(jq -c --argjson m "$map" '(.pages[].widgets[].fields[] | select(.type == 2 or .type == 3 or .type == 4) | .value) |= $m[.]' "$f")
+name=$(jq -r .name <<<"$dash")
+old=$(z dashboard.get "$(jq -nc --arg n "$name" '{output: ["dashboardid"], filter: {name: [$n]}}')" | jq -c 'map(.dashboardid)')
+[ "$old" = '[]' ] || z dashboard.delete "$old" >/dev/null
+z dashboard.create "$dash" >/dev/null
+echo "dashboard \"$name\" created"

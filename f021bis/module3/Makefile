@@ -13,6 +13,11 @@
 #   make catch-up-lab3   the same with lab3/solution, plus podinfo and its load in
 #                        namespace podinfo, your template `<name> podinfo by HTTP`
 #                        imported (made to match the file) before the hosts
+#   make catch-up-lab4   the end of the module: lab4/solution (the proxy and
+#                        kube-state-metrics on the control plane, the template's
+#                        triggers, host `<name> proxy`), podinfo's triggers made to
+#                        depend on the worker's *not ready*, dashboard `<name> mon`.
+#                        Not the action nor a maintenance: not part of an export
 #
 # The pieces are targets too (mon, chart, …); the step files show the
 # commands they run, this is only for getting back on track.
@@ -42,6 +47,10 @@ catch-up-lab2: mon
 catch-up-lab3: mon
 	$(MAKE) m3 LAB=lab3
 	$(MAKE) chart control-plane podinfo templates hosts token
+
+catch-up-lab4: mon
+	$(MAKE) m3 LAB=lab4
+	$(MAKE) chart control-plane podinfo templates hosts token deps dashboard
 
 mon:
 	@test -r $(ZBX_ENV) || { echo "no $(ZBX_ENV): make -C lab0 credentials"; exit 1; }
@@ -120,4 +129,15 @@ token:
 	      TOK=$$tok jq -nc --arg i "$$id" '{hostmacroid: $$i, value: env.TOK, type: 1}' \
 	        | lab0/zapi usermacro.update - >/dev/null && echo "token set: macro $$id"; done
 
-.PHONY: catch-up-lab1 catch-up-lab2 catch-up-lab3 mon m3 chart podinfo templates hosts control-plane token
+# Lab 4 step 1: podinfo's triggers depend on the worker's *not ready*. Set on
+# the host's inherited triggers, which a host export leaves out; waits for the
+# node discovery to have created the trigger.
+deps:
+	$(ENV); lab0/depend "$$ZBX_USER podinfo" "podinfo: " "$$ZBX_USER mon nodes" \
+	  "Kubernetes nodes: Node [$$CLUSTER-worker] Conditions: Is not in Ready state"
+
+# Lab 4 step 3: the dashboard, from ~/m3/dashboard.json (names, not ids).
+dashboard:
+	$(ENV); lab0/dashboard $(M3)/dashboard.json
+
+.PHONY: catch-up-lab1 catch-up-lab2 catch-up-lab3 catch-up-lab4 mon m3 chart podinfo templates hosts control-plane token deps dashboard

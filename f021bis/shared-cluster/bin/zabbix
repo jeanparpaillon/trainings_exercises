@@ -27,6 +27,10 @@
 #             groups; read on the `Templates*` template groups, on the other
 #             tenants' host groups and on `Applications`, where discovered
 #             Kubernetes hosts land: everyone sees everyone's hosts.
+#             Each user also gets a media of type `Lab webhook` (sendto
+#             <name>), created here, whose script only logs and returns OK:
+#             what an action sends shows as *Sent*, with its text, in the
+#             problem's Actions, and nothing leaves the server (lab 4).
 #             Re-runnable: creates what is missing, recomputes the rights and
 #             the user's groups, never rotates a password or a PSK. Those are
 #             kept in Secret zabbix/zabbix-user-<name>, created once, and
@@ -104,6 +108,11 @@ ids() {      # <ids json array> | ids <object> <what>: delete them, say how many
 
 say() { printf '  %-14s %s\n' "$1" "$2"; }
 
+MEDIA_ID=
+medias() {   # medias <name>: the user's media list, Lab webhook only, every severity, always
+  jq -nc --arg m "$MEDIA_ID" --arg n "$1" '[{mediatypeid: $m, sendto: $n, active: 0, severity: 63, period: "1-7,00:00-24:00"}]'
+}
+
 random() { openssl rand -base64 24 | tr -d '/+=' | head -c 24; }
 
 tenant_login() {
@@ -124,6 +133,32 @@ tenant_list() {  # tenant_list [name…]: those names, or every name in $USERS
     case $name in ''|'#'*) continue ;; esac
     echo "$name"
   done < "$USERS"
+}
+
+# Lab 4's media type: a webhook that sends nothing. Created once, enabled.
+MEDIA="Lab webhook"
+media_type() {
+  local id
+  id=$(id_of mediatype mediatypeid name "$MEDIA")
+  if [ -n "$id" ]; then
+    echo "media type \"$MEDIA\": unchanged" >&2
+  else
+    id=$(jq -n --arg n "$MEDIA" '{name: $n, type: 4, status: 0,
+        description: "Module 3 lab 4: logs the message on the server and returns OK; sends nothing.",
+        parameters: [{name: "to", value: "{ALERT.SENDTO}"}, {name: "subject", value: "{ALERT.SUBJECT}"},
+                     {name: "message", value: "{ALERT.MESSAGE}"}],
+        script: "var p = JSON.parse(value);\nZabbix.log(3, \"[Lab webhook] to \" + p.to + \": \" + p.subject);\nreturn \"OK\";",
+        message_templates: [
+          {eventsource: 0, recovery: 0, subject: "Problem: {EVENT.NAME}",
+           message: "{EVENT.SEVERITY} on {HOST.NAME} since {EVENT.DATE} {EVENT.TIME}\n{EVENT.NAME}\nEvent {EVENT.ID}"},
+          {eventsource: 0, recovery: 1, subject: "Resolved in {EVENT.DURATION}: {EVENT.NAME}",
+           message: "{HOST.NAME}: resolved at {EVENT.RECOVERY.DATE} {EVENT.RECOVERY.TIME}\nEvent {EVENT.ID}"},
+          {eventsource: 0, recovery: 2, subject: "Updated: {EVENT.NAME}",
+           message: "{USER.FULLNAME} {EVENT.UPDATE.ACTION} at {EVENT.UPDATE.DATE} {EVENT.UPDATE.TIME}\n{EVENT.UPDATE.MESSAGE}"}]}' \
+      | rpc mediatype.create | jq -r '.mediatypeids[0]')
+    echo "media type \"$MEDIA\": created" >&2
+  fi
+  echo "$id"
 }
 
 tenant_create() {  # tenant_create <name>
@@ -177,19 +212,19 @@ tenant_create() {  # tenant_create <name>
   [ -n "$roleid" ] || { echo "users: no role \"Admin role\" on the server" >&2; exit 1; }
   uid=$(id_of user userid username "$p")
   if [ -z "$uid" ]; then
-    PW=$pw jq -n --arg n "$p" --arg r "$roleid" --arg u "$ugid" \
-      '{username: $n, passwd: env.PW, roleid: $r, usrgrps: [{usrgrpid: $u}]}' \
+    PW=$pw jq -n --arg n "$p" --arg r "$roleid" --arg u "$ugid" --argjson m "$(medias "$p")" \
+      '{username: $n, passwd: env.PW, roleid: $r, usrgrps: [{usrgrpid: $u}], medias: $m}' \
       | rpc user.create >/dev/null
     say user created
   elif [ -n "$new" ]; then
     # The Secret was lost but the user was not: the Secret is the truth.
-    PW=$pw jq -n --arg i "$uid" --arg r "$roleid" --arg u "$ugid" \
-      '{userid: $i, passwd: env.PW, roleid: $r, usrgrps: [{usrgrpid: $u}]}' \
+    PW=$pw jq -n --arg i "$uid" --arg r "$roleid" --arg u "$ugid" --argjson m "$(medias "$p")" \
+      '{userid: $i, passwd: env.PW, roleid: $r, usrgrps: [{usrgrpid: $u}], medias: $m}' \
       | rpc user.update >/dev/null
     say user "password reset (new Secret)"
   else
-    jq -n --arg i "$uid" --arg r "$roleid" --arg u "$ugid" \
-      '{userid: $i, roleid: $r, usrgrps: [{usrgrpid: $u}]}' \
+    jq -n --arg i "$uid" --arg r "$roleid" --arg u "$ugid" --argjson m "$(medias "$p")" \
+      '{userid: $i, roleid: $r, usrgrps: [{usrgrpid: $u}], medias: $m}' \
       | rpc user.update >/dev/null
     say user unchanged
   fi
@@ -356,6 +391,7 @@ case ${1:-} in
     list=$(tenant_list "$@")
     [ -n "$list" ] || { echo "users: nobody in $USERS" >&2; exit 1; }
     tenant_login
+    [ -n "$del" ] || MEDIA_ID=$(media_type)
     # fd 3: nothing in the loop may eat the list from stdin.
     while read -r -u 3 name; do
       if [ -n "$del" ]; then tenant_delete "$name"; else tenant_create "$name"; fi
