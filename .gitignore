@@ -4,3 +4,4 @@
 # Secret values (see f021/module1/wordpress/step2-config/db.env.example).
 /f021/module1/wordpress/step2-config/db.env
 .envrc
+/f021/module2/network/step2-gateway/httproute.yaml

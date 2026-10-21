@@ -97,7 +97,7 @@ Legend: ✅ reuse as is · ✏️ update · 🆕 new
 | Lab | Slides | Status | Material |
 | --- | --- | --- | --- |
 | Persistent storage, scale-up, StatefulSet | `lab_storage.md` | ✅ | `module2/storage/` step1-pvc, step2-scale, step3-statefulset, on top of `module1/wordpress/step2-config` |
-| Expose and reach your application (DNS, headless Service, Ingress, HTTPRoute, break it, default deny) | `lab_network.md` | 🆕 | On WordPress or Bookinfo. Gateway API: check the shared cluster's Traefik serves HTTPRoutes in attendee namespaces (`gatewayapi-rbac.yaml`) |
+| Expose and reach your application (DNS, HTTPRoute, break it, default deny) | `lab_network.md` | ✅ | `module2/network/` step1-dns … step4-netpol, on Bookinfo. Check on the first build: HTTPRoute accepted by the shared Gateway, kindnet enforces NetworkPolicy |
 
 ### Module 3 — Scaling and high availability
 
