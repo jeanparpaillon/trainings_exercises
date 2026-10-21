@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# troubleshoot/break <n> — inject scenario n into your namespace.
+# Do not read scenarios/ first: the method is the exercise.
+source "$(dirname "$0")/lib.sh"
+n=${1:?usage: troubleshoot/break <1-7>}
+f=$here/scenarios/$n.sh
+[ -f "$f" ] || die "no scenario $n"
+source "$f"
+check_it >/dev/null 2>&1 || die "your namespace is not healthy before scenario $n: troubleshoot/reset first"
+break_it
+echo "Scenario $n is in. What you are told: $symptom."
+echo "troubleshoot/check $n when you think it is fixed."

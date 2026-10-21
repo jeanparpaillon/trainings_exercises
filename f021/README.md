@@ -60,7 +60,7 @@ This repo holds what the labs run.
 | `module1/` | Fundamental concepts and cluster architecture | first deployment · Helm · CronJob · Bookinfo · WordPress |
 | `module2/` | Storage and network management | storage and StatefulSet · expose and reach your application |
 | `module3/` | Scaling and high availability | measure, right-size, autoscale · harden the application |
-| `module4/` | Monitoring, logging and troubleshooting | metrics, dashboards, alerts · troubleshooting scenarios |
+| `module4/` | Monitoring, logging and troubleshooting | troubleshooting scenarios (monitoring: trainer demo, no lab) |
 | `module5/` | Kubernetes cluster security | least privilege · Pod Security, network policies, secrets |
 | `module6/` | Observability, CI/CD and troubleshooting | deploy from CI · GitOps pipeline |
 | `module7/` | Best practices for operations and administration | tenants (demo) · backup (demo) · production checklist |
@@ -108,10 +108,11 @@ Legend: ✅ reuse as is · ✏️ update · 🆕 new
 
 ### Module 4 — Monitoring, logging and troubleshooting
 
+No monitoring lab: the audience is developers, Grafana / Prometheus are shown in a trainer demo (last slide of `monitoring.md`), using Bookinfo from `module3/harden/`.
+
 | Lab | Slides | Status | Material |
 | --- | --- | --- | --- |
-| Metrics, dashboards and alerts | `lab_monitoring.md` | 🆕 | kube-prometheus-stack is on the shared cluster (`grafana-users.sh` for logins). Needed: ServiceMonitor or PodMonitor allowed in attendee namespaces, a dashboard JSON, a PrometheusRule. No log stack yet: add Loki, or leave logs to `kubectl logs` |
-| Troubleshooting scenarios | `lab_troubleshooting.md` | ✏️ | Port `f021bis/module1/lab5/` (`break` / `check` / `reset`, `scenarios/`), which targets a kind `prod` cluster with `docker exec` on the nodes. Keep the namespace-level scenarios: 3 Service selector, 4 quota blocks a rollout, 5 NetworkPolicy blocks DNS, 7 PVC / node affinity. Drop 2, 6 and 8 (node level) and 1 (mesh). Add a wrong image / pull secret and a failing probe |
+| Troubleshooting scenarios | `lab_troubleshooting.md` | ✅ | `module4/troubleshoot/` (`break` / `check` / `reset`, `scenarios/1-7`), on the namespace as module 3 left it, attendee's own rights. Ported from `f021bis/module1/lab5/` (namespace-level scenarios; the quota and storage ones reworked), plus a wrong image tag and a failing liveness probe. Not run on the cluster yet |
 
 ### Module 5 — Kubernetes cluster security
 

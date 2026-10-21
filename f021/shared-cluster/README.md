@@ -149,7 +149,7 @@ Per lab of the eight-module program (see [`../README.md`](../README.md)).
 | 3 · harden, step "spread and budgets" | several nodes to drain | **single node**: trainer demo on kind |
 | 4 · monitoring | kube-prometheus-stack, Grafana logins, ServiceMonitor / PrometheusRule rights | installed |
 | 4 · logging | a log stack (Loki + an agent) | **not installed**: `kubectl logs` only, or add it here |
-| 4 · troubleshooting | namespace-level faults only; the quota scenario needs the trainer | nothing to install |
+| 4 · troubleshooting | namespace-level faults only (`module4/troubleshoot/`), run with the trainee's rights; scenario 6 needs NetworkPolicy enforcement | nothing to install |
 | 5 · least privilege | starting from `trainee` rights | installed |
 | 5 · Pod Security | trainees label their own namespace | installed (`trainee-<name>-namespace-labels`) |
 | 5 · secrets | SOPS (client side + Flux decryption); ESO / Vault optional | SOPS needs nothing in-cluster beyond Flux; ESO, Vault **not installed** |
