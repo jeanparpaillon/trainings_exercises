@@ -1,0 +1,50 @@
+# One VPA per Deployment, recommend only: it never touches a pod (the
+# shared cluster runs the recommender alone, no updater, no admission
+# controller). Read them with `kubectl describe vpa`.
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: productpage-v1
+spec:
+  targetRef: { apiVersion: apps/v1, kind: Deployment, name: productpage-v1 }
+  updatePolicy: { updateMode: "Off" }
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: details-v1
+spec:
+  targetRef: { apiVersion: apps/v1, kind: Deployment, name: details-v1 }
+  updatePolicy: { updateMode: "Off" }
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: ratings-v1
+spec:
+  targetRef: { apiVersion: apps/v1, kind: Deployment, name: ratings-v1 }
+  updatePolicy: { updateMode: "Off" }
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: reviews-v1
+spec:
+  targetRef: { apiVersion: apps/v1, kind: Deployment, name: reviews-v1 }
+  updatePolicy: { updateMode: "Off" }
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: reviews-v2
+spec:
+  targetRef: { apiVersion: apps/v1, kind: Deployment, name: reviews-v2 }
+  updatePolicy: { updateMode: "Off" }
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: reviews-v3
+spec:
+  targetRef: { apiVersion: apps/v1, kind: Deployment, name: reviews-v3 }
+  updatePolicy: { updateMode: "Off" }

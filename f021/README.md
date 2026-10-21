@@ -103,7 +103,7 @@ Legend: ✅ reuse as is · ✏️ update · 🆕 new
 
 | Lab | Slides | Status | Material |
 | --- | --- | --- | --- |
-| Measure, right-size, autoscale (throttling, OOM, VPA, HPA on CPU and on request rate) | `perf_lab1.md` | ✏️ | Today `module3/README.md` Lab 1, steps written but **no step directories yet**. Check what the shared cluster has: metrics-server, VPA recommender, the Prometheus adapter for the request-rate HPA |
+| Measure, right-size, autoscale (throttling, OOM, VPA, HPA on CPU and on request rate) | `perf_lab1.md` | ✅ | `module3/autoscale/` step1-baseline … step6-hpa-rps and `k6/ramp.yaml`, on module 1 Bookinfo; quota-sized (HPA max 3, WordPress scaled to 0) |
 | Harden the application (baseline, probes, graceful shutdown, spread and budgets, timeouts, fallback) | `failure_lab1.md` | ✏️ | `module2/lab1/` step1–step6 and `module2/k6/`. Step 4 drains a node: trainer demo on the shared cluster, or kind. Steps 5–6 optional |
 
 ### Module 4 — Monitoring, logging and troubleshooting

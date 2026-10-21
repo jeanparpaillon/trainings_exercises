@@ -1,0 +1,37 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../step5-hpa-cpu
+  - hpa.yaml
+
+patches:
+  # One HPA per Deployment: the CPU one goes.
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: productpage
+    patch: |-
+      $patch: delete
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata:
+        name: productpage
+  # Mesh productpage: the Linkerd proxy counts the requests the HPA scales
+  # on. The proxy is one more container in the pod — with its own requests,
+  # set here, or the namespace quota refuses the pod.
+  - target:
+      kind: Deployment
+      name: productpage-v1
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: productpage-v1
+      spec:
+        template:
+          metadata:
+            annotations:
+              linkerd.io/inject: enabled
+              config.linkerd.io/proxy-cpu-request: 10m
+              config.linkerd.io/proxy-memory-request: 32Mi
+              config.linkerd.io/proxy-memory-limit: 64Mi

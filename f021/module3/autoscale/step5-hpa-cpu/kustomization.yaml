@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../step4-vpa
+  - hpa.yaml
+
+# The HPA's utilisation is a percentage of the request: write one.
+patches:
+  - target:
+      kind: Deployment
+      name: productpage-v1
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: productpage-v1
+      spec:
+        template:
+          spec:
+            containers:
+              - name: productpage
+                resources:
+                  requests:
+                    cpu: 100m
+                  limits:
+                    cpu: "1"

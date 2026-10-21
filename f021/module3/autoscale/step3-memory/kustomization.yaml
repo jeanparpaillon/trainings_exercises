@@ -1,0 +1,51 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../step2-cpu
+
+patches:
+  # ratings (Node.js): a memory limit too small for it under load, on
+  # purpose. Part 1 of the step: find the OOMKill, then raise both values
+  # to what you measured, and re-apply.
+  - target:
+      kind: Deployment
+      name: ratings-v1
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: ratings-v1
+      spec:
+        template:
+          spec:
+            containers:
+              - name: ratings
+                resources:
+                  requests:
+                    memory: 32Mi
+                  limits:
+                    memory: 32Mi
+  # reviews (Java, Liberty on OpenJ9): memory request = limit, and the
+  # heap sized from that limit instead of the JVM's default quarter.
+  - target:
+      kind: Deployment
+      labelSelector: app=reviews
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: reviews
+      spec:
+        template:
+          spec:
+            containers:
+              - name: reviews
+                env:
+                  - name: JAVA_TOOL_OPTIONS
+                    value: -XX:MaxRAMPercentage=75
+                resources:
+                  requests:
+                    memory: 256Mi
+                  limits:
+                    memory: 256Mi

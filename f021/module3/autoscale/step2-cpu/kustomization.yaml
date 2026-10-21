@@ -1,0 +1,28 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../step1-baseline
+
+# reviews: an explicit CPU request, and the CPU limit raised to the
+# LimitRange maximum. A limit cannot be removed here: a container without
+# one gets the LimitRange default (500m) — the throttling of step 1.
+patches:
+  - target:
+      kind: Deployment
+      labelSelector: app=reviews
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: reviews
+      spec:
+        template:
+          spec:
+            containers:
+              - name: reviews
+                resources:
+                  requests:
+                    cpu: 100m
+                  limits:
+                    cpu: "2"

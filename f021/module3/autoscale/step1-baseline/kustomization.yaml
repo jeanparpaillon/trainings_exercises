@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Bookinfo as module 1 left it: no resources written anywhere, so every
+# container gets the namespace LimitRange defaults (50m / 64Mi requested,
+# 500m / 256Mi limits). loadgen is stopped: k6 is the only traffic.
+resources:
+  - ../../../module1/lab1/step3-balancing
+
+replicas:
+  - name: loadgen
+    count: 0
