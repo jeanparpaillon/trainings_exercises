@@ -8,14 +8,14 @@
 # request is read, then nothing.
 #
 # Replace ratings with it:
-#   kubectl -n "$NS" apply -f faults/ratings-blackhole.yaml
+#   kubectl -n "$NS" apply -f harden/faults/ratings-blackhole.yaml
 #   kubectl -n "$NS" scale deploy/ratings-v1 --replicas=0
 #
 # Put ratings back:
 #   kubectl -n "$NS" scale deploy/ratings-v1 --replicas=1
-#   kubectl -n "$NS" delete -f faults/ratings-blackhole.yaml
+#   kubectl -n "$NS" delete -f harden/faults/ratings-blackhole.yaml
 #
-# Used by lab 1 (steps 2 and 5) and replayed in lab 2.
+# Used by steps 2 and 5.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -34,8 +34,6 @@ spec:
       labels:
         app: ratings
         version: blackhole
-      annotations:
-        linkerd.io/inject: enabled
     spec:
       serviceAccountName: bookinfo-ratings
       containers:

@@ -1,13 +1,13 @@
-# The day-2 load generator: a k6 run against productpage at a constant
+# The load generator of the harden lab: a k6 run against productpage at a constant
 # arrival rate, with a summary at the end (failed-request ratio, p95/p99).
 #
-#   kubectl -n "$NS" apply -f k6/constant-load.yaml
+#   kubectl -n "$NS" apply -f harden/k6/constant-load.yaml
 #   kubectl -n "$NS" logs -f job/k6 -c k6    # the summary is printed at the end
 #
 # A Job runs once. To run again, delete it first (the ConfigMap can stay):
 #
 #   kubectl -n "$NS" delete job k6 --ignore-not-found
-#   kubectl -n "$NS" apply -f k6/constant-load.yaml
+#   kubectl -n "$NS" apply -f harden/k6/constant-load.yaml
 #
 # RATE and DURATION below are the knobs. 20 req/s for 3 min leaves time to
 # start a rollout or a drain once the numbers have settled.
@@ -89,6 +89,10 @@ spec:
         # The proxy is a native sidecar: the Job still completes when k6
         # exits. Read the logs with `-c k6`.
         linkerd.io/inject: enabled
+        # The namespace quota has requests.cpu: the proxy needs its own.
+        config.linkerd.io/proxy-cpu-request: 10m
+        config.linkerd.io/proxy-memory-request: 32Mi
+        config.linkerd.io/proxy-memory-limit: 64Mi
     spec:
       restartPolicy: Never
       containers:

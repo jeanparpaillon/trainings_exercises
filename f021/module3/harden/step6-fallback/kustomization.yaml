@@ -1,0 +1,7 @@
+# Optional step. No new objects: the fallback it looks at is application
+# code. End state of the lab, and of module 3.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../step5-timeouts

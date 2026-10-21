@@ -1,0 +1,55 @@
+# Two replicas of productpage and of reviews-v2, spread across nodes.
+#
+# The namespace quota (1 CPU requested) does not leave room for two
+# replicas of every reviews version: v2 gets two, v1 and v3 stay at one.
+# productpage's replica count belongs to its HPA: the step raises the HPA's
+# minimum to 2 instead of writing `replicas`.
+#
+#   kubernetes.io/hostname  DoNotSchedule  hard: never two replicas on one
+#                                          node while another has none
+#
+# On the single-node shared cluster this rule is trivially satisfied: both
+# replicas land on the one node. It is still the manifest you want, and the
+# trainer shows a drain on a multi-node cluster.
+#
+# matchLabelKeys: pod-template-hash counts only the current ReplicaSet;
+# nodeTaintsPolicy: Honor leaves out nodes the pod cannot run on.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: productpage-v1
+spec:
+  template:
+    spec:
+      topologySpreadConstraints:
+        - topologyKey: kubernetes.io/hostname
+          maxSkew: 1
+          whenUnsatisfiable: DoNotSchedule
+          nodeTaintsPolicy: Honor
+          labelSelector:
+            matchLabels: { app: productpage, version: v1 }
+          matchLabelKeys: [pod-template-hash]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reviews-v2
+spec:
+  replicas: 2
+  template:
+    spec:
+      topologySpreadConstraints:
+        - topologyKey: kubernetes.io/hostname
+          maxSkew: 1
+          whenUnsatisfiable: DoNotSchedule
+          nodeTaintsPolicy: Honor
+          labelSelector:
+            matchLabels: { app: reviews, version: v2 }
+          matchLabelKeys: [pod-template-hash]
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: productpage-rps
+spec:
+  minReplicas: 2

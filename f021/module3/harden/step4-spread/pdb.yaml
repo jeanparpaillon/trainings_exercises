@@ -1,0 +1,27 @@
+# One PodDisruptionBudget per Deployment with two replicas: a drain, a node
+# upgrade or the cluster autoscaler may evict at most one at a time. The
+# eviction API refuses the second (HTTP 429) until the first replacement
+# is Ready.
+#
+# Voluntary disruptions only — the ones that go through the eviction API.
+# A node crash, an OOM kill or `kubectl delete pod` do not ask.
+#
+# minAvailable: 1 is only safe because replicas is 2: on one replica it
+# makes every drain wait forever.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: productpage-v1
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app: productpage, version: v1 }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: reviews-v2
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app: reviews, version: v2 }

@@ -1,0 +1,8 @@
+# Optional step. No new objects: the timeouts it looks at are hardcoded in
+# the Bookinfo images. The fault is ../faults/ratings-blackhole.yaml,
+# applied by hand. The overlay exists so that apply -k lands you here.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../step4-spread

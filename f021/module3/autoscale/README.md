@@ -10,7 +10,7 @@ cd module3                                   # every path below is relative to i
 kubectl -n "$NS" scale deploy/wordpress sts/mysql --replicas=0   # frees quota
 ```
 
-WordPress comes back at the end of the lab (`--replicas=1`). The namespace
+WordPress comes back at the end of module 3 (`harden/`, `--replicas=1`). The namespace
 quota is **1 CPU requested**: the HPAs here stop at 3 replicas for that
 reason, and `kubectl -n "$NS" describe quota` is the first thing to read if
 a pod is missing.
@@ -159,8 +159,8 @@ proxy a CPU request? Why is request rate a better signal than CPU for
 ## Afterwards
 
 ```sh
-kubectl -n "$NS" scale deploy/wordpress sts/mysql --replicas=1
 kubectl -n "$NS" delete job k6 --ignore-not-found
 ```
 
-Keep the rest: session 2 (harden the application) starts from here.
+Keep the rest — and WordPress at 0: session 2 (`harden/`) starts from
+here, within the same quota. WordPress comes back at the end of it.

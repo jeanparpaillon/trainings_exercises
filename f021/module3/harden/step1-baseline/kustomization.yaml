@@ -1,0 +1,9 @@
+# Starts from the end of the autoscale lab: Bookinfo right-sized, productpage
+# meshed with an HPA on requests per second. Nothing hardened yet: no
+# probes, no graceful shutdown, one replica each. Load comes from k6
+# (../k6/constant-load.yaml, a Job applied by hand).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../autoscale/step6-hpa-rps

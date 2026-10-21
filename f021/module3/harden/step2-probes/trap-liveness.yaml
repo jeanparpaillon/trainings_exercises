@@ -1,8 +1,8 @@
 # THE TRAP — do not keep this. Applied by hand, watched, then reverted:
 #
-#   kubectl -n "$NS" patch deploy productpage-v1 --patch-file lab1/step2-probes/trap-liveness.yaml
+#   kubectl -n "$NS" patch deploy productpage-v1 --patch-file harden/step2-probes/trap-liveness.yaml
 #   ...
-#   kubectl -n "$NS" apply -k lab1/step2-probes        # back to the sane probe
+#   kubectl -n "$NS" apply -k harden/step2-probes        # back to the sane probe
 #
 # A liveness probe that looks thorough: it fetches the real page, so it
 # "checks everything". It does — /productpage calls details, reviews and,
