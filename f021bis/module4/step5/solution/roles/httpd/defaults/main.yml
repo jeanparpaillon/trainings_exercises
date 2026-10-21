@@ -1,0 +1,3 @@
+---
+# The <h1> of the home page; group_vars/web.yml overrides it.
+web_title: m4

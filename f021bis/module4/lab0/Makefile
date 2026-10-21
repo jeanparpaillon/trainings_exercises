@@ -1,17 +1,18 @@
-# Module 4 — the managed hosts, in your console. From module4/:
+# Module 4 — the managed hosts, in your console. From module4/ (whose
+# Makefile wraps image, up, down, reset, check and pull-consoles):
 #
 #   make -C lab0 image         m4-node:latest (node/)
 #   make -C lab0 up            node1…node3 at fixed IPs on network m4, their names in
 #                              /etc/hosts, their host keys in ~/.ssh/known_hosts
 #   make -C lab0 reset         down, then up: back to the INITIAL state (root + password
-#                              `redhat` only) — before lab 1, lab 4's checks, the exam
+#                              `redhat` only) — before step 1, or step 5's check
 #   make -C lab0 down          delete the nodes and the network
 #   make -C lab0 check         what is there
 #
 # Trainer:
 #
-#   make -C lab0 pull-consoles   in every console: module 2's nodes down, then image up
-#                                (before session 1)
+#   make -C lab0 pull-consoles   in every console: module 2's nodes down, then venv,
+#                                image, up (the day before)
 #
 # Module 2's nodes have the same names: `up` refuses to start while they exist
 # (`make -C ../../module2/lab0 down`), and removes module 2's /etc/hosts and
@@ -116,7 +117,7 @@ check:
 	ok 'ssh root@node1' "$$(ssh -o BatchMode=yes -o ConnectTimeout=5 -o PreferredAuthentications=none \
 	  -o UserKnownHostsFile=$(KNOWN_HOSTS) root@$(NODE_PREFIX).11 true 2>&1 \
 	  | grep -q 'Permission denied (.*password' && echo 'password login offered' || echo FAILED)"; \
-	ok 'dnf cache on node1' "$$(docker exec node1 dnf -C -q repoquery nginx 2>/dev/null | grep -q nginx && echo ok || echo MISSING)"; \
+	ok 'dnf cache on node1' "$$(docker exec node1 dnf -C -q repoquery httpd 2>/dev/null | grep -q httpd && echo ok || echo MISSING)"; \
 	ok 'dl.rockylinux.org' "$$(docker exec node1 curl -sf -m 10 -o /dev/null https://dl.rockylinux.org/pub/rocky/9/ \
 	  && echo 'reachable (only for packages outside the cache)' || echo 'unreachable (fine: the labs use the cache)')"
 
@@ -126,7 +127,7 @@ pull-consoles:
 	  $(CONSOLES_KUBECTL) exec $$d -c console -- sh -c \
 	    'cd ~/trainings_exercises && git pull -q --ff-only \
 	     && make -s -C f021bis/module2/lab0 down \
-	     && make -s -C f021bis/module4/lab0 image up' & \
+	     && make -s -C f021bis/module4 venv image up' & \
 	done; wait
 
 .PHONY: image up hosts known-hosts ssh-config down reset check pull-consoles

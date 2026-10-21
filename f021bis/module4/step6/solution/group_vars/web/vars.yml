@@ -1,0 +1,3 @@
+---
+web_title: Module 4
+web_auth_password: "{{ vault_web_auth_password }}"

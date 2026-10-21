@@ -50,16 +50,20 @@ module3/README.md          Zabbix: spec of labs 1-4 (3 trainees, alone, one prox
                            hosts linked to shipped templates — lab0/import).
                            Template exports need per-trainee v4 uuids:
                            ${UUID:<seed>} in solutions, made by lab0/render
-module4/README.md          Ansible certification: spec of labs 1-5, lab0, exam.
-                           lab0 written (Rocky 9 node image in the exam's initial
-                           state: root/redhat over SSH only; m4 network, fixed
-                           IPs; refuses to start beside module 2's same-named
-                           nodes; dnf offline: metadata + every lab RPM baked in
-                           its cache, weak deps included) and labs 1-2 +
-                           catch-up-lab1/2 written, run on a laptop (console =
-                           ubuntu:24.04 + its ansible 2.16.3, OpenSSH 9.6: no
-                           `ssh-keyscan -q`), not on the server; labs 3-5 and
-                           exam not written
+module4/README.md          Ansible certification (EX407), one 4 h session:
+                           step0…step6/ (README + solution/ = a whole ~/m4),
+                           Makefile (venv, catch-up-step1…6, wraps lab0),
+                           versions.env. Ansible 2.9.27 in ~/.venv/m4 on a
+                           Python 3.8 fetched by uv: 2.7 cannot manage Rocky 9
+                           (platform.dist), neither runs on the console's 3.12.
+                           Short module names only (no FQCN in 2.9). lab0 =
+                           Rocky 9 node image in the exam's initial state
+                           (root/redhat over SSH only; m4 network, fixed IPs;
+                           refuses to start beside module 2's same-named nodes;
+                           dnf offline: httpd, mariadb-server, tree baked in its
+                           cache, weak deps included). All run on a laptop with
+                           offline nodes (console = ubuntu:24.04, OpenSSH 9.6:
+                           no `ssh-keyscan -q`), not on the server
 ```
 
 Bookinfo states are cumulative overlays: `bookinfo/` → `lab2/step3-install`

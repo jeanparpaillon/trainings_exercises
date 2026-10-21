@@ -1,0 +1,30 @@
+---
+- import_playbook: web.yml
+
+- name: Database
+  hosts: db
+  tasks:
+    - name: mariadb-server is installed
+      package:
+        name: mariadb-server
+        state: present
+
+    - name: mariadb is running and enabled
+      service:
+        name: mariadb
+        state: started
+        enabled: true
+
+- name: Users
+  hosts: all
+  tasks:
+    - name: Users from the list
+      user:
+        name: "{{ item.name }}"
+        groups: "{{ item.groups }}"
+      loop: "{{ m4_users }}"
+
+    - name: webadmin, on web only
+      user:
+        name: webadmin
+      when: "'web' in group_names"

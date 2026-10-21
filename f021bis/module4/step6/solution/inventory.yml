@@ -1,0 +1,14 @@
+---
+all:
+  vars:
+    # Ansible 2.9 does not know Rocky: without this, a warning per host and
+    # per run (it discovers /usr/libexec/platform-python).
+    ansible_python_interpreter: /usr/bin/python3
+  children:
+    web:
+      hosts:
+        node1:
+        node2:
+    db:
+      hosts:
+        node3:

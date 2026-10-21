@@ -1,0 +1,8 @@
+<h1>{{ web_title | default('m4') }}</h1>
+<p>{{ inventory_hostname }} — {{ ansible_default_ipv4.address | default(ansible_all_ipv4_addresses | first) }}</p>
+<p>{{ ansible_distribution }} {{ ansible_distribution_version }}</p>
+<ul>
+{% for h in groups['web'] %}
+  <li>{{ h }}</li>
+{% endfor %}
+</ul>

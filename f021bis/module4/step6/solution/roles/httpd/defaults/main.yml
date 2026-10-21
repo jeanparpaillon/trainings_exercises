@@ -1,0 +1,9 @@
+---
+# The <h1> of the home page; group_vars/web/vars.yml overrides it.
+web_title: m4
+
+# /private/: basic auth, one user. No default for its password: it comes
+# from the vault (group_vars/web/vault.yml).
+web_auth_user: m4
+# A fixed salt, or the hash — and the task — changes on every run.
+web_auth_salt: m4salt

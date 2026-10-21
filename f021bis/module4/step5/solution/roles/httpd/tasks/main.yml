@@ -1,0 +1,31 @@
+---
+- name: httpd is installed
+  package:
+    name: httpd
+    state: present
+
+- name: HTTP is open in the firewall
+  firewalld:
+    service: http
+    permanent: true
+    immediate: true
+    state: enabled
+
+- name: Home page
+  template:
+    src: index.html.j2
+    dest: /var/www/html/index.html
+    mode: "0644"
+
+- name: httpd snippet
+  template:
+    src: m4.conf.j2
+    dest: /etc/httpd/conf.d/m4.conf
+    mode: "0644"
+  notify: Restart httpd
+
+- name: httpd is running and enabled
+  service:
+    name: httpd
+    state: started
+    enabled: true

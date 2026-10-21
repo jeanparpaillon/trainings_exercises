@@ -1,0 +1,8 @@
+# Managed by Ansible
+ServerName {{ inventory_hostname }}
+Header set X-Managed-By ansible
+
+# httpd ignores .htaccess by default (AllowOverride None).
+<Directory "/var/www/html/private">
+    AllowOverride AuthConfig
+</Directory>

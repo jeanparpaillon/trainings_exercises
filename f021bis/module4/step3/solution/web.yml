@@ -1,0 +1,21 @@
+---
+- name: Web server
+  hosts: web
+  tasks:
+    - name: httpd is installed
+      package:
+        name: httpd
+        state: present
+
+    - name: HTTP is open in the firewall
+      firewalld:
+        service: http
+        permanent: true
+        immediate: true
+        state: enabled
+
+    - name: httpd is running and enabled
+      service:
+        name: httpd
+        state: started
+        enabled: true

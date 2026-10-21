@@ -1,0 +1,6 @@
+---
+m4_users:
+  - name: alice
+    groups: wheel
+  - name: bob
+    groups: ""
