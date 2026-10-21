@@ -1,0 +1,66 @@
+# MySQL for WordPress. Step 1 writes the credentials in clear in the
+# manifest, on purpose: step 2 moves them to a ConfigMap and a Secret.
+#
+# Data is on an emptyDir: it goes when the pod goes. Module 2 (storage)
+# replaces it with a PersistentVolumeClaim.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  labels:
+    app: mysql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.4
+          env:
+            - name: MYSQL_DATABASE
+              value: wordpress
+            - name: MYSQL_USER
+              value: wordpress
+            - name: MYSQL_PASSWORD
+              value: wordpress          # in clear, in git: fixed in step 2
+            - name: MYSQL_RANDOM_ROOT_PASSWORD
+              value: "1"                # nobody needs root
+          ports:
+            - containerPort: 3306
+              name: mysql
+          # The namespace LimitRange defaults to a 256Mi limit, too small
+          # for MySQL 8: it would be OOM-killed during initialisation.
+          # 768Mi, not more: module 2 runs two of them plus three WordPress
+          # next to Bookinfo, within the 4Gi limits.memory quota.
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              memory: 768Mi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/mysql
+      volumes:
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  labels:
+    app: mysql
+spec:
+  selector:
+    app: mysql
+  ports:
+    - port: 3306
+      targetPort: mysql
+      name: mysql

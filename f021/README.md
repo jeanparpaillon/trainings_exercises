@@ -90,13 +90,13 @@ Legend: ✅ reuse as is · ✏️ update · 🆕 new
 | Chart the sample app, version, publish, deploy | `helm.md` | 🆕 | Needed: `sample-app/` (copy of `devops/exercises/nodejs_server`) with plain manifests in `k8s/` (Deployment, Service, Ingress, ConfigMap) as the starting point, the expected chart as solution, and the publication target switched to GHCR (OCI) |
 | CronJob | `cron.md` | 🆕 | One Job, one CronJob, `create job --from=cronjob/` |
 | Deploy Bookinfo, service discovery, round-robin | `microservices_lab1.md` | ✅ | `module1/lab1/` step1–step3 |
-| WordPress + MySQL, Secret | `lab_wordpress.md` | ✏️ | Copy `devops/k8s/` (wordpress / mysql manifests, the Secret variant) into kustomize steps; shared-cluster Ingress instead of NodePort; Secret from a gitignored file, as in `bp_secrets.md` |
+| WordPress + MySQL, Secret | `lab_wordpress.md` | ✅ | `module1/wordpress/` step1-deploy, step2-config (Secret from the git-ignored `db.env`) |
 
 ### Module 2 — Storage and network management
 
 | Lab | Slides | Status | Material |
 | --- | --- | --- | --- |
-| Persistent storage, scale-up, StatefulSet | `lab_storage.md` | ✏️ | From `devops/k8s/` (`mysql-pvc.yaml`, `mysql-deployment-pv.yml`, `mysql-statefulset.yml`). Drop the hand-written PV (attendees cannot create PVs): PVC on StorageClass `standard`. Make the RWO / Multi-Attach problem the point of the scale-up step |
+| Persistent storage, scale-up, StatefulSet | `lab_storage.md` | ✅ | `module2/storage/` step1-pvc, step2-scale, step3-statefulset, on top of `module1/wordpress/step2-config` |
 | Expose and reach your application (DNS, headless Service, Ingress, HTTPRoute, break it, default deny) | `lab_network.md` | 🆕 | On WordPress or Bookinfo. Gateway API: check the shared cluster's Traefik serves HTTPRoutes in attendee namespaces (`gatewayapi-rbac.yaml`) |
 
 ### Module 3 — Scaling and high availability

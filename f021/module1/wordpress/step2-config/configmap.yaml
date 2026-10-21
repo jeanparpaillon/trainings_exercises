@@ -1,0 +1,10 @@
+# What is not secret: database name, user, host. Shared by both
+# Deployments, so they cannot drift apart.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wordpress-db
+data:
+  host: mysql:3306
+  database: wordpress
+  user: wordpress

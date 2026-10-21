@@ -1,2 +1,6 @@
-/module1/lab1/step1-deploy/ingress.yaml
+# Rendered per attendee from *.tmpl, never committed.
+/f021/module1/lab1/step1-deploy/ingress.yaml
+/f021/module1/wordpress/step1-deploy/ingress.yaml
+# Secret values (see f021/module1/wordpress/step2-config/db.env.example).
+/f021/module1/wordpress/step2-config/db.env
 .envrc

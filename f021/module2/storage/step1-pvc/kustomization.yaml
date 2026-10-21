@@ -1,0 +1,29 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Continues the WordPress lab of module 1 (ConfigMap + Secret).
+resources:
+  - ../../../module1/wordpress/step2-config
+  - pvc.yaml
+
+# MySQL data moves from the pod's emptyDir to the claim. Recreate: never
+# two MySQL pods on the same data, not even during a rollout.
+patches:
+  - target:
+      kind: Deployment
+      name: mysql
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: mysql
+      spec:
+        strategy:
+          type: Recreate
+        template:
+          spec:
+            volumes:
+              - name: data
+                emptyDir: null
+                persistentVolumeClaim:
+                  claimName: mysql-data

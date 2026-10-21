@@ -1,0 +1,16 @@
+# Dynamic provisioning: ask for 1Gi on the cluster's default StorageClass,
+# the provisioner creates the PersistentVolume. No hand-written PV: on the
+# shared cluster attendees cannot create PVs (cluster-scoped).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-data
+  labels:
+    app: mysql
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 1Gi

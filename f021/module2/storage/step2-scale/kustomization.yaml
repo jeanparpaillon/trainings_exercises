@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../step1-pvc
+
+# Scale both tiers. WordPress is stateless (posts are in the database):
+# three replicas just work. MySQL is not: two pods, one data directory.
+replicas:
+  - name: wordpress
+    count: 3
+  - name: mysql
+    count: 2

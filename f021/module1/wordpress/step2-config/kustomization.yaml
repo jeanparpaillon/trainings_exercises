@@ -1,0 +1,69 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# The Secret `wordpress-db` is NOT part of this kustomization: it is
+# created from the git-ignored db.env with kubectl (see README.md), so the
+# password never lands in a tracked file.
+resources:
+  - ../step1-deploy
+  - configmap.yaml
+
+# Same env var names, values now read from the ConfigMap and the Secret.
+# `value: null` removes the clear-text value of step 1.
+patches:
+  - target:
+      kind: Deployment
+      name: mysql
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: mysql
+      spec:
+        template:
+          spec:
+            containers:
+              - name: mysql
+                env:
+                  - name: MYSQL_DATABASE
+                    value: null
+                    valueFrom:
+                      configMapKeyRef: { name: wordpress-db, key: database }
+                  - name: MYSQL_USER
+                    value: null
+                    valueFrom:
+                      configMapKeyRef: { name: wordpress-db, key: user }
+                  - name: MYSQL_PASSWORD
+                    value: null
+                    valueFrom:
+                      secretKeyRef: { name: wordpress-db, key: password }
+  - target:
+      kind: Deployment
+      name: wordpress
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: wordpress
+      spec:
+        template:
+          spec:
+            containers:
+              - name: wordpress
+                env:
+                  - name: WORDPRESS_DB_HOST
+                    value: null
+                    valueFrom:
+                      configMapKeyRef: { name: wordpress-db, key: host }
+                  - name: WORDPRESS_DB_NAME
+                    value: null
+                    valueFrom:
+                      configMapKeyRef: { name: wordpress-db, key: database }
+                  - name: WORDPRESS_DB_USER
+                    value: null
+                    valueFrom:
+                      configMapKeyRef: { name: wordpress-db, key: user }
+                  - name: WORDPRESS_DB_PASSWORD
+                    value: null
+                    valueFrom:
+                      secretKeyRef: { name: wordpress-db, key: password }

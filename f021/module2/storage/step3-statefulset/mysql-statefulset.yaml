@@ -1,0 +1,76 @@
+# MySQL as a StatefulSet: stable pod name (mysql-0), and one claim per pod
+# from volumeClaimTemplates (data-mysql-0), kept when the pod is deleted.
+# Same env, resources and labels as the Deployment it replaces, so the
+# `mysql` Service still selects it.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql
+  labels:
+    app: mysql
+spec:
+  serviceName: mysql-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.4
+          env:
+            - name: MYSQL_DATABASE
+              valueFrom:
+                configMapKeyRef: { name: wordpress-db, key: database }
+            - name: MYSQL_USER
+              valueFrom:
+                configMapKeyRef: { name: wordpress-db, key: user }
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: wordpress-db, key: password }
+            - name: MYSQL_RANDOM_ROOT_PASSWORD
+              value: "1"
+          ports:
+            - containerPort: 3306
+              name: mysql
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              memory: 768Mi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/mysql
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: standard
+        resources:
+          requests:
+            storage: 1Gi
+---
+# The governing Service of the StatefulSet: gives each pod a DNS name,
+# mysql-0.mysql-headless.<ns>.svc.cluster.local. WordPress keeps using the
+# ClusterIP Service `mysql`.
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-headless
+  labels:
+    app: mysql
+spec:
+  clusterIP: None
+  selector:
+    app: mysql
+  ports:
+    - port: 3306
+      targetPort: mysql
+      name: mysql
