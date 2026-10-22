@@ -75,6 +75,7 @@ From `module4/`, in the console:
 | `make image` · `up` · `down` · `reset` · `check` | `lab0/`'s targets, below |
 | `make catch-up-stepN` | `~/m4` = `stepN/solution`, one commit, tag `stepN`; then the whole chain from the bootstrap with root's password (`bootstrap.sh`, then `web.yml` or `site.yml`), so it works on blank nodes too. An existing `~/m4` is moved aside to `~/m4.<date>`. Step 6's also writes `~/.vault_pass` (`m4vault`), moving a different one aside |
 | `make pull-consoles` | trainer, from their machine: in every console, module 2's nodes `down`, then `venv image up` |
+| `make reset-consoles` | trainer, from their machine: `make reset` in every console, in parallel, one output line per console prefixed with its name; `~/m4`, the venv and `~/.vault_pass` are not touched |
 
 The Makefile puts `~/.venv/m4/bin` first in `PATH`, so its targets use the
 venv's Ansible whether the trainee's shell has activated it or not.
@@ -229,4 +230,5 @@ first console run.
 Before the session: roll the consoles to `f021bis-console:3` (sshpass),
 then `make pull-consoles` (module 2's nodes down, venv, image and nodes in
 every console), `make check` and `ansible all -i node1,node2,node3, -m ping
--u root -k` from one console to prove the path.
+-u root -k` from one console to prove the path. If anyone used the nodes
+since (a dry run, early birds): `make reset-consoles` just before step 1.

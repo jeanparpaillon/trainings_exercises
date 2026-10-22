@@ -13,6 +13,9 @@
 #
 #   make -C lab0 pull-consoles   in every console: module 2's nodes down, then venv,
 #                                image, up (the day before)
+#   make -C lab0 reset-consoles  in every console: reset — every trainee's nodes back
+#                                to root/redhat (before step 1, if they were used);
+#                                ~/m4 is not touched
 #
 # Module 2's nodes have the same names: `up` refuses to start while they exist
 # (`make -C ../../module2/lab0 down`), and removes module 2's /etc/hosts and
@@ -130,4 +133,12 @@ pull-consoles:
 	     && make -s -C f021bis/module4 venv image up' & \
 	done; wait
 
-.PHONY: image up hosts known-hosts ssh-config down reset check pull-consoles
+# One line per console, prefixed with its name: they run in parallel.
+reset-consoles:
+	for d in $$($(CONSOLES_KUBECTL) get deploy -o name); do \
+	  $(CONSOLES_KUBECTL) exec $$d -c console -- sh -c \
+	    'make -s -C ~/trainings_exercises/f021bis/module4/lab0 reset' 2>&1 \
+	    | sed "s|^|$${d#*/}: |" & \
+	done; wait
+
+.PHONY: image up hosts known-hosts ssh-config down reset check pull-consoles reset-consoles

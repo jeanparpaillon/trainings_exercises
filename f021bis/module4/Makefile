@@ -14,6 +14,7 @@
 # Trainer:
 #
 #   make pull-consoles     in every console: module 2's nodes down, venv, image, up
+#   make reset-consoles    in every console: make reset (~/m4 untouched)
 #
 # catch-up: an existing ~/m4 is moved aside to ~/m4.<date>, never deleted. The
 # nodes must be up; they are not reset — each target replays the whole chain
@@ -58,7 +59,7 @@ venv: $(UV)
 image up down reset check:
 	@$(MAKE) -s -C lab0 $@
 
-pull-consoles:
+pull-consoles reset-consoles:
 	$(MAKE) -C lab0 $@
 
 # $(call solution,<dir>,<tag>): ~/m4 = <dir>, one commit, a tag.
@@ -99,5 +100,5 @@ catch-up-step6: $(SSH_KEY) vault-pass
 	$(call solution,step6/solution,step6)
 	cd $(M4) && $(BOOTSTRAP) && ansible-playbook site.yml
 
-.PHONY: venv image up down reset check pull-consoles vault-pass \
+.PHONY: venv image up down reset check pull-consoles reset-consoles vault-pass \
 	catch-up-step1 catch-up-step2 catch-up-step3 catch-up-step4 catch-up-step5 catch-up-step6
