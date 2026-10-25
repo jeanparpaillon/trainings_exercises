@@ -111,14 +111,14 @@ No monitoring lab: the audience is developers, Grafana / Prometheus are shown in
 
 | Lab | Slides | Status | Material |
 | --- | --- | --- | --- |
-| Troubleshooting scenarios | `lab_troubleshooting.md` | ✅ | `module4/troubleshoot/` (`break` / `check` / `reset`, `scenarios/1-7`), on the namespace as module 3 left it, attendee's own rights. Ported from `f021bis/module1/lab5/` (namespace-level scenarios; the quota and storage ones reworked), plus a wrong image tag and a failing liveness probe. Not run on the cluster yet |
+| Troubleshooting scenarios | `lab_troubleshooting.md` | ✅ | `module4/troubleshoot/` (`break` / `check` / `reset`, `scenarios/1-7`), on the namespace as module 3 left it, attendee's own rights. Ported from `f021bis/module1/lab5/` (namespace-level scenarios; the quota and storage ones reworked), plus a wrong image tag and a failing liveness probe. Reviewed: each `fix_it` + `reset` undoes exactly what `break_it` changed (including the env var `apply` alone would keep); the objects they create pass a server dry-run. Not run on the cluster yet. `module4/README.md` is the module page; the former day 4 is `module4/former-day4.md` |
 
 ### Module 5 — Kubernetes cluster security
 
 | Lab | Slides | Status | Material |
 | --- | --- | --- | --- |
-| Least privilege for people and pods | `sec_lab1.md` | ✏️ | Today `module4/README.md` Lab 1, **no step directories yet**. Steps 0–1 (a developer identity, lose cluster-admin) need cluster-admin: on the shared cluster, start from the attendee's real `trainee` rights instead. Steps 4–5 (short-lived tokens, escalation hunt) optional |
-| Pod Security, network policies, secrets | `sec_lab2.md` | ✏️ | Today `module4/README.md` Lab 2, **no step directories yet**. Part B overlaps `lab_network.md` step 5: keep one. Part C (SOPS / ESO / Vault): check what the shared cluster runs; the Linkerd authorization step is optional |
+| Least privilege for people and pods | `sec_lab1.md` | ✏️ | Today `module4/former-day4.md` Lab 1, **no step directories yet**. Steps 0–1 (a developer identity, lose cluster-admin) need cluster-admin: on the shared cluster, start from the attendee's real `trainee` rights instead. Steps 4–5 (short-lived tokens, escalation hunt) optional |
+| Pod Security, network policies, secrets | `sec_lab2.md` | ✏️ | Today `module4/former-day4.md` Lab 2, **no step directories yet**. Part B overlaps `lab_network.md` step 5: keep one. Part C (SOPS / ESO / Vault): check what the shared cluster runs; the Linkerd authorization step is optional |
 
 ### Module 6 — Observability, CI/CD and troubleshooting
 
@@ -154,7 +154,7 @@ layout.
 | `module1/exerciseB/` (empty) | Linkerd multicluster |
 | `module2/lab2/`, `module2/former-day2.md`, `module2/kind.yaml` | mesh timeouts, retries, failure accrual; Chaos Mesh pod kill, delay, partition |
 | `module3/README.md` Lab 2, Slot 4 | images and startup, network latency; profiling; bottleneck, KEDA, cost |
-| `module4/README.md` Slot 4 | audit workshop; red / blue team, policy-as-code, compliance evidence |
+| `module4/former-day4.md` Slot 4 | audit workshop; red / blue team, policy-as-code, compliance evidence |
 
 ## Other updates
 
