@@ -96,7 +96,7 @@ Legend: ✅ reuse as is · ✏️ update · 🆕 new
 | Lab | Slides | Status | Material |
 | --- | --- | --- | --- |
 | Persistent storage, scale-up, StatefulSet | `lab_storage.md` | ✅ | `module2/storage/` step1-pvc, step2-scale, step3-statefulset, on top of `module1/wordpress/step2-config` |
-| Expose and reach your application (DNS, HTTPRoute, break it, default deny) | `lab_network.md` | ✅ | `module2/network/` step1-dns … step4-netpol, on Bookinfo. Check on the first build: HTTPRoute accepted by the shared Gateway, kindnet enforces NetworkPolicy |
+| Expose and reach your application (DNS, HTTPRoute, break it, default deny) | `lab_network.md` | ✅ | `module2/network/` step1-dns … step4-netpol, on Bookinfo. Shared Gateway needs the Gateway API CRDs at Traefik's version (v1.6.3: with v1.4 the GatewayClass is never accepted). Still to run end to end: HTTPRoute accepted, default deny enforced by kindnet |
 
 ### Module 3 — Scaling and high availability
 
@@ -140,7 +140,7 @@ No monitoring lab: the audience is developers, Grafana / Prometheus are shown in
 
 | Lab | Slides | Status | Material |
 | --- | --- | --- | --- |
-| Game day | `failure_game.md` | ✏️ | Today `module2/README.md` Game day, built on Chaos Mesh and the mesh. Rewrite with faults a namespace admin can inject and fix: the troubleshooting scenarios of module 4, plus a bad rollout, quota exhaustion and a missing Secret. Teams fix through the pipeline of module 6 |
+| Game day | `failure_game.md` | ✏️ | Today `module2/former-day2.md` Game day, built on Chaos Mesh and the mesh. Rewrite with faults a namespace admin can inject and fix: the troubleshooting scenarios of module 4, plus a bad rollout, quota exhaustion and a missing Secret. Teams fix through the pipeline of module 6 |
 | Open questions, architecture review | `use_cases.md` | ✅ | No material: discussion of SGA use cases brought by the attendees, no hands-on on their applications |
 
 ## Former material not used in the new program
@@ -152,7 +152,7 @@ layout.
 | --- | --- |
 | `module1/lab2/` | Linkerd install, injection, mTLS, golden metrics, traffic split, Istio demo |
 | `module1/exerciseB/` (empty) | Linkerd multicluster |
-| `module2/lab2/`, `module2/faults/` | mesh timeouts, retries, failure accrual; Chaos Mesh pod kill, delay, partition |
+| `module2/lab2/`, `module2/former-day2.md`, `module2/kind.yaml` | mesh timeouts, retries, failure accrual; Chaos Mesh pod kill, delay, partition |
 | `module3/README.md` Lab 2, Slot 4 | images and startup, network latency; profiling; bottleneck, KEDA, cost |
 | `module4/README.md` Slot 4 | audit workshop; red / blue team, policy-as-code, compliance evidence |
 

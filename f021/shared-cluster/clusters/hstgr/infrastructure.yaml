@@ -20,9 +20,14 @@ metadata:
 spec:
   interval: 24h
   url: https://github.com/kubernetes-sigs/gateway-api
-  # Standard channel; Traefik 3.7 and Linkerd edge both support it.
+  # Standard channel. Follow Traefik's go.mod (sigs.k8s.io/gateway-api):
+  # Traefik 3.7 watches TLSRoute v1, standard only from v1.5 — with v1.4
+  # its informer never syncs and the GatewayClass stays Accepted=Unknown,
+  # the Gateway Pending, every HTTPRoute ignored. Linkerd only uses
+  # HTTPRoute / GRPCRoute v1. From v1.5 the bundle also installs a
+  # ValidatingAdmissionPolicy refusing CRD downgrades below v1.5.
   ref:
-    tag: v1.4.0
+    tag: v1.6.3
   ignore: |
     /*
     !/config/crd/standard/

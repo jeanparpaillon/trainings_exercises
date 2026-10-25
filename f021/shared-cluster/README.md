@@ -142,7 +142,7 @@ Per lab of the eight-module program (see [`../README.md`](../README.md)).
 | all | namespace `admin` only (`TRAINEES_CLUSTER_ADMIN=false`), quota `trainee` | installed (tenants) |
 | 6 · CI/CD | GHCR reachable from the node, public images (or an `imagePullSecret` per namespace) | nothing to install; **check** pulls from `ghcr.io` |
 | 2 · storage, StatefulSet | StorageClass `standard`, PVCs in the quota | installed |
-| 2 · network | Gateway `traefik/traefik-gateway`, HTTPRoute rights | installed (Traefik values, `gatewayapi-rbac.yaml`) |
+| 2 · network | Gateway `traefik/traefik-gateway`, HTTPRoute rights; Gateway API CRDs at the version of Traefik's `go.mod` (v1.6, for `TLSRoute` v1) | installed (Traefik values, `gatewayapi-rbac.yaml`); **check** `kubectl get gatewayclass traefik`: `ACCEPTED True` |
 | 2 · network, 5 · Pod Security / NetworkPolicy | a CNI that enforces NetworkPolicy | kindnet enforces it since kind 0.24: **check** with a default-deny in a test namespace |
 | 3 · autoscale | metrics-server, VPA recommender, prometheus-adapter (`requests_per_second`) | installed |
 | 3 · autoscale, step "HPA on request rate" | Bookinfo meshed (Linkerd proxies export `request_total`) | Linkerd installed; the step injects the namespace |
