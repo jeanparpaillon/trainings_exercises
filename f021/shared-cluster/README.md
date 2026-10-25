@@ -210,8 +210,8 @@ flux-system ─► gateway-api ─► infra-controllers ─► infra-configs ─
 Needs, on the trainer's machine: `ssh root@srv2052563.hstgr.cloud` working,
 `kubectl`, the `flux` CLI (same version as `FLUX_VERSION`), `gh` logged in,
 `openssl`, `ssh-keygen`, `htpasswd` (apache2-utils). On the server: Docker,
-kind. Only one of the f021 and f021bis clusters can run on the server at a
-time (same ports, see [`kind.yaml`](kind.yaml)).
+kind. The f021 session runs on the same server as f021bis, in place of its
+cluster: see [Switching from f021bis](#switching-from-f021bis) first.
 
 ```sh
 make create        # kind cluster `training` on the server
@@ -249,6 +249,28 @@ curl -s -o /dev/null -w '%{http_code}\n' \
 ```
 
 and `linkerd check`, `linkerd viz check` if Linkerd matters for the session.
+
+### Switching from f021bis
+
+Both clusters publish the server's 80/443/6443 ([`kind.yaml`](kind.yaml)),
+so the f021bis cluster goes before `make create` (which refuses while
+`training-f021bis` exists). From this directory:
+
+```sh
+ssh root@srv2052563.hstgr.cloud kind get clusters      # training-f021bis?
+make -C ../../f021bis/shared-cluster delete           # its consoles' homes and Docker data go with it
+ssh root@srv2052563.hstgr.cloud docker rm -f zabbix-trapper   # f021bis's port 10051 forward
+```
+
+Delete it only once nothing on it is needed: every f021bis console home,
+trainee kind cluster and Zabbix database goes with it. The rest of what f021bis left on
+the server is harmless and stays: `/etc/sysctl.d/99-zz-f021bis-kind.conf`
+(raised inotify limits), `/root/f021bis/`, `/root/users/consoles.txt`, the
+`f021bis-console` image. f021 does not read the f021bis users file: its
+trainees and passwords are `TRAINEES` and `secrets/passwords.txt`.
+
+Going back to f021bis is the reverse: `make delete` here (every PVC goes),
+then the f021bis build from `make create`.
 
 ## Trainer — day to day
 

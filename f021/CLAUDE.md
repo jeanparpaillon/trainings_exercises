@@ -14,9 +14,13 @@ or one deployed locally with `kind` (https://kind.sigs.k8s.io/).
 Everything about it is in `shared-cluster/`: a single-node `kind` cluster named
 `training` (node `training-control-plane`) on `srv2052563.hstgr.cloud`, created by
 `shared-cluster/kind.yaml` (`make create`), the same baseline as the f021bis cluster
-(`../f021bis/shared-cluster/`). Both clusters claim the server's ports 80/443/6443:
-only one runs at a time. Check which with `ssh root@srv2052563.hstgr.cloud kind get
-clusters` before assuming the f021 one exists.
+(`../f021bis/shared-cluster/`). f021 runs on the same server *in place of* the
+f021bis cluster: both claim ports 80/443/6443, so only one runs at a time, and
+`make create` refuses while `training-f021bis` exists (switch steps in
+`shared-cluster/README.md`, "Switching from f021bis"). Check which with `ssh
+root@srv2052563.hstgr.cloud kind get clusters` before assuming the f021 one exists.
+Trainees reach it the same way as f021bis, through their ttyd web console at
+`https://srv2052563.hstgr.cloud/<name>/`.
 
 - **Platform = Flux, from this repo** (path `f021/shared-cluster/clusters/hstgr`):
   Traefik + its Gateway, Linkerd, kube-prometheus-stack, Headlamp, metrics-server,

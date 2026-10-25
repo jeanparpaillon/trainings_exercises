@@ -27,7 +27,12 @@ all:
 	@echo "First install: make create kubeconfig image secrets bootstrap watch, then make grafana-users kubeconfigs check"
 	@echo "make help for the list of targets"
 
+# f021 replaces the f021bis cluster on the server (same ports 80/443/6443,
+# kind.yaml): refuse while it is there, rather than fail halfway through
+# kind create with a port already bound.
 create:
+	@! ssh $(S) kind get clusters 2>/dev/null | grep -qx training-f021bis || { \
+	  echo 'training-f021bis still runs on the server: see "Switching from f021bis" in README.md'; exit 1; }
 	ssh $(S) mkdir -p $(REMOTE)
 	scp kind.yaml $(S):$(REMOTE)/kind.yaml
 	ssh $(S) kind create cluster --name $(NAME) --config $(REMOTE)/kind.yaml
