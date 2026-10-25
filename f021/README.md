@@ -102,8 +102,8 @@ Legend: ✅ reuse as is · ✏️ update · 🆕 new
 
 | Lab | Slides | Status | Material |
 | --- | --- | --- | --- |
-| Measure, right-size, autoscale (throttling, OOM, VPA, HPA on CPU and on request rate) | `perf_lab1.md` | ✅ | `module3/autoscale/` step1-baseline … step6-hpa-rps and `k6/ramp.yaml`, on module 1 Bookinfo; quota-sized (HPA max 3, WordPress scaled to 0) |
-| Harden the application (baseline, probes, graceful shutdown, replicas and budgets, timeouts, fallback) | `failure_lab1.md` | ✅ | `module3/harden/` step1-baseline … step6-fallback, on `autoscale/step6-hpa-rps`. Single node: eviction API instead of a drain (drain = trainer demo). Steps 5–6 optional |
+| Measure, right-size, autoscale (throttling, OOM, VPA, HPA on CPU and on request rate) | `perf_lab1.md` | ✅ | `module3/autoscale/` step1-baseline … step6-hpa-rps and `k6/ramp.yaml`, on module 1 Bookinfo; quota-sized (HPA max 3, WordPress scaled to 0). Checked on the cluster: metrics-server, VPA recommender, `requests_per_second` served and readable by trainees; server dry-run of every step. Not run end to end yet |
+| Harden the application (baseline, probes, graceful shutdown, replicas and budgets, timeouts, fallback) | `failure_lab1.md` | ✅ | `module3/harden/` step1-baseline … step6-fallback, on `autoscale/step6-hpa-rps`. Single node: eviction API instead of a drain (drain = trainer demo). Steps 5–6 optional. Fits the quota at ~950m CPU requested during a step 4 rollout; Linkerd native sidecars, so the meshed k6 Job completes. Not run end to end yet |
 
 ### Module 4 — Monitoring, logging and troubleshooting
 
