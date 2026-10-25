@@ -1,0 +1,23 @@
+# A task that runs to completion: a stand-in for a database migration.
+# Done when the container exits 0; never restarted after that, and not run
+# again by a second `apply` — the pod template of a Job is immutable.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrate
+  labels:
+    app: migrate
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 120
+  ttlSecondsAfterFinished: 600      # the Job and its pod go 10 min after it ends
+  template:
+    metadata:
+      labels:
+        app: migrate
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: busybox:1.37
+          command: ["sh", "-c", "echo migrating; sleep 5; echo done"]

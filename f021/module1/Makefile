@@ -1,8 +1,9 @@
-# Module 1 — pre-pull the container images used by lab1, lab2 and the
-# advanced exercises, so a room of attendees does not stall on the
-# registries at the start of a slot.
+# Module 1 — pre-pull the container images used by the labs (and by the
+# former lab2), so a room of attendees does not stall on the registries at
+# the start of a slot.
 #
-#   make pull            # everything (tools + bookinfo + emojivoto + meshes)
+#   make pull            # everything (basics + tools + bookinfo + emojivoto + meshes)
+#   make pull-basics     # first-deploy and cronjob only
 #   make pull-bookinfo   # lab1 only
 #   make -j4 pull        # in parallel
 #   make load            # push what was pulled into a kind cluster
@@ -16,6 +17,8 @@ BOOKINFO_VERSION ?= 1.20.3
 ISTIO_VERSION ?= 1.31.1
 EMOJIVOTO_VERSION ?= v11
 BUSYBOX_VERSION ?= 1.36
+NGINX_VERSIONS ?= 1.29 1.30
+BASICS_BUSYBOX_VERSION ?= 1.37
 LINKERD_VERSION ?= edge-26.9.3
 LINKERD_EXTENSION_INIT_VERSION ?= v0.1.12
 LINKERD_PROMETHEUS_VERSION ?= v2.55.1
@@ -25,6 +28,11 @@ KIND_CLUSTER ?= kind
 DOCKERIO_REGISTRY ?= docker.io
 ISTIO_REGISTRY ?= registry.istio.io/release
 LINKERD_REGISTRY ?= cr.l5d.io/linkerd
+
+# first-deploy (nginx, before and after the rollout) and cronjob
+BASICS_IMAGES := \
+	$(NGINX_VERSIONS:%=nginx:%) \
+	busybox:$(BASICS_BUSYBOX_VERSION)
 
 # lab1 + lab2 — toolbox, load generator, init container and log-shipper sidecar
 TOOLS_IMAGES := \
@@ -61,7 +69,7 @@ ISTIO_IMAGES := \
 	$(DOCKERIO_REGISTRY)/istio/pilot:$(ISTIO_VERSION) \
 	$(DOCKERIO_REGISTRY)/istio/proxyv2:$(ISTIO_VERSION)
 
-IMAGES := $(TOOLS_IMAGES) $(BOOKINFO_IMAGES) $(EMOJIVOTO_IMAGES) $(LINKERD_IMAGES) $(ISTIO_IMAGES)
+IMAGES := $(BASICS_IMAGES) $(TOOLS_IMAGES) $(BOOKINFO_IMAGES) $(EMOJIVOTO_IMAGES) $(LINKERD_IMAGES) $(ISTIO_IMAGES)
 
 DOCKER ?= docker
 KIND ?= kind
@@ -73,8 +81,9 @@ KIND ?= kind
 # gives them their recipe. They match no file on disk, so they always run.
 target = $(subst :,+,$(1:%=$(2)/%))
 
-pull: pull-tools pull-bookinfo pull-emojivoto pull-linkerd pull-istio
+pull: pull-basics pull-tools pull-bookinfo pull-emojivoto pull-linkerd pull-istio
 
+pull-basics: $(call target,$(BASICS_IMAGES),pull)
 pull-tools: $(call target,$(TOOLS_IMAGES),pull)
 pull-bookinfo: $(call target,$(BOOKINFO_IMAGES),pull)
 pull-emojivoto: $(call target,$(EMOJIVOTO_IMAGES),pull)
@@ -105,6 +114,7 @@ list:
 
 help:
 	@echo "pull            pull every image below (add -j4 to parallelise)"
+	@echo "pull-basics     first-deploy, cronjob: nginx and busybox"
 	@echo "pull-tools      lab1+2: busybox, for the toolbox, loadgen and sidecars"
 	@echo "pull-bookinfo   lab1: Bookinfo, the multi-service application"
 	@echo "pull-emojivoto  lab2: emojivoto, the Linkerd demo application"
@@ -114,4 +124,4 @@ help:
 	@echo "check           report which images are already in the local store"
 	@echo "list            print the image list"
 
-.PHONY: pull pull-tools pull-bookinfo pull-emojivoto pull-linkerd pull-istio load check list help
+.PHONY: pull pull-basics pull-tools pull-bookinfo pull-emojivoto pull-linkerd pull-istio load check list help

@@ -43,12 +43,12 @@ This repo holds what the labs run.
     (modules 1–2)
   - **Bookinfo** for microservices, scaling, HA, monitoring, security
     (modules 1, 3, 4, 5)
-  - **`sample-app/`** for Helm and CI/CD (modules 1, 6): the Node.js
+  - **`sample-app/`** for CI/CD (module 6, Kustomize + Flux, no Helm): the Node.js
     server of the DevOps training (`devops/exercises/nodejs_server` in the
     trainings repo), which attendees already containerized and built with
     GitHub Actions. Each attendee works on their own copy (a GitHub repo
     created from it), not on an application of their own
-- **GitHub tooling**: GitHub Actions and GHCR for images and charts;
+- **GitHub tooling**: GitHub Actions and GHCR for images;
   Xray only as one scanner among others.
 - **No service mesh or chaos tooling required.** Linkerd stays on the
   shared cluster, but no lab of the new program depends on it.
@@ -57,7 +57,7 @@ This repo holds what the labs run.
 
 | Directory | Module | Labs |
 | --- | --- | --- |
-| `module1/` | Fundamental concepts and cluster architecture | first deployment · Helm · CronJob · Bookinfo · WordPress |
+| `module1/` | Fundamental concepts and cluster architecture | first deployment · CronJob · Bookinfo · WordPress |
 | `module2/` | Storage and network management | storage and StatefulSet · expose and reach your application |
 | `module3/` | Scaling and high availability | measure, right-size, autoscale · harden the application |
 | `module4/` | Monitoring, logging and troubleshooting | troubleshooting scenarios (monitoring: trainer demo, no lab) |
@@ -65,7 +65,7 @@ This repo holds what the labs run.
 | `module6/` | Observability, CI/CD and troubleshooting | deploy from CI · GitOps pipeline |
 | `module7/` | Best practices for operations and administration | tenants (demo) · backup (demo) · production checklist |
 | `module8/` | Hands-on workshops and real-world use cases | game day |
-| `sample-app/` | — | the application of the Helm and CI/CD labs, with its plain manifests |
+| `sample-app/` | — | the application of the CI/CD labs, with its plain manifests |
 
 Moving the existing material into this layout is the first update:
 
@@ -86,9 +86,8 @@ Legend: ✅ reuse as is · ✏️ update · 🆕 new
 
 | Lab | Slides | Status | Material |
 | --- | --- | --- | --- |
-| First deployment (nginx: deploy, expose, self-heal, scale, roll out, roll back, ConfigMap) | `section-kubernetes.md` | 🆕 | One step per objective, plus the broken-tag rollout. The `k8s/` folder it produces is the input of the Helm lab |
-| Chart the sample app, version, publish, deploy | `helm.md` | 🆕 | Needed: `sample-app/` (copy of `devops/exercises/nodejs_server`) with plain manifests in `k8s/` (Deployment, Service, Ingress, ConfigMap) as the starting point, the expected chart as solution, and the publication target switched to GHCR (OCI) |
-| CronJob | `cron.md` | 🆕 | One Job, one CronJob, `create job --from=cronjob/` |
+| First deployment (nginx: deploy, expose, self-heal, scale, roll out, roll back, ConfigMap) | `section-kubernetes.md` | ✅ | `module1/first-deploy/` step1-deploy … step3-configmap: attendees write their own `first-deploy/k8s/` (git-ignored), the steps are the solution; the broken-tag rollout is done by hand (`set image`), not in an overlay. The `k8s/` folder it produces is the model for the sample app's Kustomize base (module 6). Server dry-run only so far |
+| Jobs and CronJob | `cron.md` | ✅ | `module1/cronjob/` step1-job (a Job that succeeds, one that fails), step2-cronjob (history, `create job --from=cronjob/`), step3-forbid (a run longer than the schedule; Allow / Replace; suspend, clean up). Server dry-run only so far |
 | Deploy Bookinfo, service discovery, round-robin | `microservices_lab1.md` | ✅ | `module1/lab1/` step1–step3 |
 | WordPress + MySQL, Secret | `lab_wordpress.md` | ✅ | `module1/wordpress/` step1-deploy, step2-config (Secret from the git-ignored `db.env`) |
 
@@ -125,9 +124,9 @@ No monitoring lab: the audience is developers, Grafana / Prometheus are shown in
 
 | Lab | Slides | Status | Material |
 | --- | --- | --- | --- |
-| Deploy from CI, without GitOps | `k8s_ci.md` | 🆕 | A workflow in `sample-app/`: build, scan (Trivy), push to GHCR, `helm upgrade` with a namespace-scoped kubeconfig |
-| GitOps pipeline: config repo, tenant, drift, secrets, pipeline, canary, alerts | `k8s_ci.md`, `gitops_lab.md` | ✏️ | Today `module5/README.md` Lab 1, **no step directories yet**. Rebase on the sample app's chart instead of Bookinfo; Artifactory → GHCR. Flagger needs Linkerd or Traefik metrics: check on the shared cluster, or keep the canary as a demo |
-| Troubleshooting a pipeline and a deployment | `ci_troubleshooting.md` | 🆕 | Broken workflows (permissions, GHCR auth), ImagePullBackOff on a private image, failed / pending Helm release, Flux object not Ready |
+| Deploy from CI, without GitOps | `k8s_ci.md` | 🆕 | A workflow in `sample-app/`: build, scan (Trivy), push to GHCR, `kubectl apply -k envs/dev` with a namespace-scoped kubeconfig. Needed: `sample-app/` (copy of `devops/exercises/nodejs_server`) with plain manifests in `k8s/` (Deployment, Service, Ingress, ConfigMap) as the starting point, and `k8s/` split into `k8s/base/` + `envs/dev/` overlay as the solution |
+| GitOps pipeline: config repo, tenant, drift, secrets, pipeline, canary, alerts | `k8s_ci.md`, `gitops_lab.md` | ✏️ | Today `module5/README.md` Lab 1, **no step directories yet**. Rebase on the sample app's Kustomize base and overlays instead of Bookinfo (Flux Kustomization per env, no HelmRelease); Artifactory → GHCR. Flagger needs Linkerd or Traefik metrics: check on the shared cluster, or keep the canary as a demo |
+| Troubleshooting a pipeline and a deployment | `ci_troubleshooting.md` | 🆕 | Broken workflows (permissions, GHCR auth), ImagePullBackOff on a private image, broken overlay (`kubectl kustomize` error), Flux Kustomization not Ready |
 
 ### Module 7 — Best practices for operations and administration
 

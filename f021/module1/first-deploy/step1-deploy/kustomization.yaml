@@ -1,0 +1,7 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Solution of objectives 1-4: what your own k8s/ folder should hold.
+resources:
+  - deployment.yaml
+  - service.yaml

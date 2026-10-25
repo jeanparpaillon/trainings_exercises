@@ -1,0 +1,22 @@
+# The same task, broken: it exits 1 every time. With restartPolicy Never,
+# each attempt is a new pod (its logs kept), spaced by a growing back-off,
+# until backoffLimit is reached and the Job turns Failed.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrate-failing
+  labels:
+    app: migrate-failing
+spec:
+  backoffLimit: 2                   # 1 attempt + 2 retries
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app: migrate-failing
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: busybox:1.37
+          command: ["sh", "-c", "echo migrating; echo 'table already exists' >&2; exit 1"]

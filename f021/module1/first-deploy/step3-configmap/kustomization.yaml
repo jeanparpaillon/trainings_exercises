@@ -1,0 +1,33 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Solution of objective 7: the ConfigMap mounted as nginx's document root.
+# A plain configmap.yaml rather than a configMapGenerator: the generator's
+# hash suffix would turn every edit into a rollout, and the point here is
+# to see the mounted file change in place.
+resources:
+  - ../step2-rollout
+  - configmap.yaml
+
+patches:
+  - target:
+      kind: Deployment
+      name: web
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: web
+      spec:
+        template:
+          spec:
+            containers:
+              - name: nginx
+                volumeMounts:
+                  - name: content
+                    mountPath: /usr/share/nginx/html
+                    readOnly: true
+            volumes:
+              - name: content
+                configMap:
+                  name: web-content

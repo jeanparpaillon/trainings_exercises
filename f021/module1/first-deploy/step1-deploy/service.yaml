@@ -1,0 +1,16 @@
+# A stable name and virtual IP in front of whatever pods carry app=web
+# and are Ready. ClusterIP (the default): reachable from inside the
+# cluster, and from your machine through `kubectl port-forward`.
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  labels:
+    app: web
+spec:
+  selector:
+    app: web
+  ports:
+    - port: 80
+      targetPort: http
+      name: http

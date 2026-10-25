@@ -1,0 +1,19 @@
+# The page nginx serves, out of the image. Edit it and re-apply: the
+# mounted file changes in the running pods within a minute or so, without
+# a restart — unlike an environment variable, read once at start.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-content
+  labels:
+    app: web
+data:
+  index.html: |
+    <!doctype html>
+    <html>
+      <head><title>web</title></head>
+      <body>
+        <h1>Hello from a ConfigMap</h1>
+        <p>Served by nginx, configured by Kubernetes.</p>
+      </body>
+    </html>

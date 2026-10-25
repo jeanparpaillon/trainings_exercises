@@ -1,7 +1,9 @@
 # Lab 1 — deploy a multi-service application
 
-No mesh yet: lab 2 adds that on top of what you
-build here.
+**Slides:** *Lab 1 — deploy a multi-service application* · **~40 min**
+
+Plain Kubernetes, no mesh. What you build here is the application of
+modules 2 to 5: keep it running.
 
 The application is [Bookinfo](https://istio.io/latest/docs/examples/bookinfo/):
 four services, one of them (`reviews`) in three versions. It is small enough to
@@ -29,20 +31,14 @@ kubectl config set-context --current --namespace="$NS"   # optional, saves typin
 kubectl auth can-i create deployments -n "$NS"
 ```
 
-On the shared cluster your namespace is your first name, and the trainer
-gives you the kubeconfig: see [`../../shared-cluster/`](../../shared-cluster/).
-Bookinfo is reached through its Traefik at
-`https://srv2052563.hstgr.cloud/<your-namespace>/bookinfo/productpage`, once
-step 1 has generated your Ingress.
+On the shared cluster your namespace is the `userN` the trainer gave you
+(see [`../../shared-cluster/`](../../shared-cluster/)); in the web console
+`$NS` is already set. Bookinfo is reached at
+`http://bookinfo.<your-namespace>.195.35.2.222.nip.io/productpage`, once
+step 1 has generated your Ingress. Every path below is relative to
+`module1/`.
 
-On kind only: images are large-ish and the room shares one uplink. Pre-pull
-them (see [`../Makefile`](../Makefile)):
-
-```sh
-make -C .. -j4 pull-tools pull-bookinfo
-make -C .. load          # kind only: pulls everything, then pushes it into
-                         # the cluster's own image store
-```
+On kind only: pre-pull the images, see [`../README.md`](../README.md).
 
 ## The steps
 
@@ -79,5 +75,5 @@ to "what did this step actually do?".
 kubectl -n "$NS" delete -k lab1/step3-balancing
 ```
 
-Keep it running if you are going straight into lab 2 — lab 2 starts from the
-step 3 state.
+Don't, unless you are leaving: the module 2 network lab, then modules 3
+to 5, start from the step 3 state.

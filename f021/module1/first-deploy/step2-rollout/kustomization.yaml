@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Solution of objective 5: four replicas, then a new image tag — written in
+# the manifests, not only with `kubectl scale` / `set image`, or the next
+# apply of the folder puts the old values back. The broken tag of
+# objective 6 is deliberately not here: it is applied by hand, then undone.
+resources:
+  - ../step1-deploy
+
+replicas:
+  - name: web
+    count: 4
+
+images:
+  - name: nginx
+    newTag: "1.30"

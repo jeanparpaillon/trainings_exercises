@@ -85,6 +85,11 @@ grafana:
     enabled: true
     storageClassName: standard
     size: 1Gi
+  # First start runs a few hundred SQLite migrations, ~0.5-1 s each on the
+  # server's disk: the chart's 60 s + 10 × 10 s killed Grafana halfway, in a
+  # loop that outlasted the release timeout. Merged into the chart's probe.
+  livenessProbe:
+    initialDelaySeconds: 600
   resources:
     requests: {cpu: 50m, memory: 128Mi}
     limits: {memory: 512Mi}

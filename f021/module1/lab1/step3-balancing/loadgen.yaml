@@ -1,7 +1,7 @@
 # Steady, boring traffic against productpage: one request per second, for as
 # long as it runs. Step 3 uses it to watch requests spread over reviews
-# v1/v2/v3; lab 2 reuses it, because a mesh dashboard with no traffic on it
-# shows nothing at all.
+# v1/v2/v3; until module 3 replaces it with k6 (autoscale/step1-baseline
+# scales it to 0), it keeps some traffic on every dashboard.
 #
 # Scale it to 0 when you want the namespace quiet:
 #   kubectl -n "$NS" scale deploy/loadgen --replicas=0

@@ -1,0 +1,29 @@
+# A Job every minute — far too often for anything real, just enough to
+# watch it work. Each tick creates a Job named hello-<minutes since epoch>.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: hello
+  labels:
+    app: hello
+spec:
+  schedule: "* * * * *"
+  timeZone: Africa/Algiers          # without it: the controller's time zone, usually UTC
+  concurrencyPolicy: Forbid         # skip a tick while the previous run is still going
+  successfulJobsHistoryLimit: 2     # finished Jobs kept, with their pods and logs
+  jobTemplate:
+    metadata:
+      labels:
+        app: hello                  # on the Jobs; the pod template's own labels go on the pods
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            app: hello
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: hello
+              image: busybox:1.37
+              command: ["sh", "-c", "date; sleep 10"]

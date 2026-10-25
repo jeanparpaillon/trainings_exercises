@@ -2,8 +2,9 @@
 
 **Slide:** Lab 1 — round-robin across reviews versions · **~10 min**
 
-Adds `loadgen`: one request per second against `productpage`, forever. Lab 2
-reuses it, because an empty dashboard proves nothing.
+Adds `loadgen`: one request per second against `productpage`, forever, so
+that there is always some traffic to look at. Module 3 stops it and uses
+k6 instead.
 
 ```sh
 kubectl -n "$NS" apply -k lab1/step3-balancing
@@ -44,14 +45,15 @@ kubectl -n "$NS" exec deploy/toolbox -- sh -c \
   'wget -q -O - --header="Connection: keep-alive" http://reviews:9080/reviews/0 | head -c 60'
 ```
 
-This is the problem a mesh fixes at L7, and the reason lab 2 exists.
+This is the problem an L7 proxy fixes — a service mesh, or Gateway API
+routes — by balancing per request.
 
 ## Note what this is *not*
 
 Running three versions behind one Service is a deployment pattern, not a
 release strategy. Nothing here lets you say "10% to v3" — the split is
-whatever the endpoint list happens to be. Getting that control is step 5 of
-lab 2.
+whatever the endpoint list happens to be. Getting that control takes an L7
+proxy again: weighted routes (deployment strategies, module 6).
 
 ## Questions to answer before moving on
 

@@ -140,7 +140,7 @@ Per lab of the eight-module program (see [`../README.md`](../README.md)).
 | --- | --- | --- |
 | all | Traefik, IngressClass `traefik`, nip.io host names | installed |
 | all | namespace `admin` only (`TRAINEES_CLUSTER_ADMIN=false`), quota `trainee` | installed (tenants) |
-| 1 · Helm, 6 · CI/CD | GHCR reachable from the node, public images and charts (or an `imagePullSecret` per namespace) | nothing to install; **check** pulls from `ghcr.io` |
+| 6 · CI/CD | GHCR reachable from the node, public images (or an `imagePullSecret` per namespace) | nothing to install; **check** pulls from `ghcr.io` |
 | 2 · storage, StatefulSet | StorageClass `standard`, PVCs in the quota | installed |
 | 2 · network | Gateway `traefik/traefik-gateway`, HTTPRoute rights | installed (Traefik values, `gatewayapi-rbac.yaml`) |
 | 2 · network, 5 · Pod Security / NetworkPolicy | a CNI that enforces NetworkPolicy | kindnet enforces it since kind 0.24: **check** with a default-deny in a test namespace |

@@ -65,4 +65,4 @@ wget -q -O - http://reviews:9080/reviews/0
 - The virtual IP of `reviews` answers on port 9080, but no process anywhere is
   listening on that address. What is actually happening to the packet?
 - Why would a gRPC client care about the difference between these two Services?
-  (Slide: *gRPC on Kubernetes* — the answer comes back in lab 2.)
+  (Slide: *gRPC on Kubernetes*.)

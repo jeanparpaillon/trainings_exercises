@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Each run now lasts 90 s, longer than the schedule: with Forbid, the ticks
+# that come while a run is active are skipped, never stacked.
+resources:
+  - ../step2-cronjob
+
+patches:
+  - target:
+      kind: CronJob
+      name: hello
+    patch: |-
+      - op: replace
+        path: /spec/jobTemplate/spec/template/spec/containers/0/command
+        value: ["sh", "-c", "date; sleep 90"]

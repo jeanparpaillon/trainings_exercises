@@ -19,6 +19,10 @@ spec:
         name: prometheus-community
   install:
     crds: CreateReplace
+    # A failed install (timeout on first start: image pulls, Grafana
+    # migrations) is retried instead of left stalled.
+    remediation:
+      retries: 3
   upgrade:
     crds: CreateReplace
   valuesFrom:
