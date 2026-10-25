@@ -20,3 +20,5 @@ resources:
   # - user7-flux.yaml
   - user8.yaml
   # - user8-flux.yaml
+  - jean.yaml
+  # - jean-flux.yaml

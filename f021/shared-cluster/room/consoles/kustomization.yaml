@@ -11,6 +11,7 @@ resources:
   - user6.yaml
   - user7.yaml
   - user8.yaml
+  - jean.yaml
 images:
   # console/, loaded into the kind node by make image (CONSOLE_IMAGE in fleet.env)
   - name: console
