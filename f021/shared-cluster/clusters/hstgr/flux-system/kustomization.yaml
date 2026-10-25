@@ -1,5 +1,8 @@
 # Committed before `flux bootstrap`: bootstrap writes gotk-components.yaml and
-# gotk-sync.yaml next to it and keeps these patches.
+# gotk-sync.yaml next to it and keeps these patches. Both must already exist,
+# empty, in the pushed branch: bootstrap builds this directory to apply the
+# controllers before it writes gotk-sync.yaml, and the build fails on a
+# missing resource.
 #
 # Multi-tenancy lockdown (fluxcd/flux2-multi-tenancy):
 #

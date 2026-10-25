@@ -228,8 +228,10 @@ make check         # consoles answer 401 (basic auth), Grafana 200
 `make secrets` must run before `make bootstrap`: the Linkerd and Grafana
 releases need their Secrets on first install. `make bootstrap` installs the
 controllers with the lockdown patches, **commits** `gotk-components.yaml` and
-`gotk-sync.yaml` under `clusters/hstgr/flux-system/` on `main` of this repo,
-and registers a read-only deploy key on it.
+`gotk-sync.yaml` under `clusters/hstgr/flux-system/` on `master` of this repo,
+and registers a read-only deploy key on it. Both files must already be on
+`master`, if only empty (they are committed so): bootstrap builds that
+directory, which lists them, before it writes them.
 
 Console passwords are in `secrets/passwords.txt` (`<name> <password> <url>`,
 the format of the f021bis server's `/root/users/consoles.txt`). **Back up

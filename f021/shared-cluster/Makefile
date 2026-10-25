@@ -68,12 +68,13 @@ secrets:
 	$(KUBECTL) apply --server-side -f secrets.yaml
 
 # Flux, with the multi-tenancy lockdown of clusters/hstgr/flux-system. Writes
-# gotk-components.yaml and gotk-sync.yaml under $(REPO_PATH) on main (a
-# commit by Flux), and registers a read-only deploy key on the repo.
+# gotk-components.yaml and gotk-sync.yaml under $(REPO_PATH) on master (a
+# commit by Flux, over the empty placeholders that must already be pushed),
+# and registers a read-only deploy key on the repo.
 bootstrap:
 	@[ -n "$$GITHUB_TOKEN" ] || { echo 'GITHUB_TOKEN=$$(gh auth token) make bootstrap'; exit 1; }
 	$(FLUX) bootstrap github --owner=$(REPO_OWNER) --repository=$(REPO_NAME) \
-	  --personal --branch=main --path=$(REPO_PATH) --version=v$(FLUX_VERSION) \
+	  --personal --branch=master --path=$(REPO_PATH) --version=v$(FLUX_VERSION) \
 	  --components-extra=image-reflector-controller,image-automation-controller
 
 watch:
