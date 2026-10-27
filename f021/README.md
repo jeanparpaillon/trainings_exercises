@@ -111,7 +111,7 @@ No monitoring lab: the audience is developers, Grafana / Prometheus are shown in
 
 | Lab | Slides | Status | Material |
 | --- | --- | --- | --- |
-| Troubleshooting scenarios | `lab_troubleshooting.md` | ✅ | `module4/troubleshoot/` (`break` / `check` / `reset`, `scenarios/1-7`), on the namespace as module 3 left it, attendee's own rights. Ported from `f021bis/module1/lab5/` (namespace-level scenarios; the quota and storage ones reworked), plus a wrong image tag and a failing liveness probe. Reviewed: each `fix_it` + `reset` undoes exactly what `break_it` changed (including the env var `apply` alone would keep); the objects they create pass a server dry-run. Not run on the cluster yet. `module4/README.md` is the module page; the former day 4 is `module4/former-day4.md` |
+| Troubleshooting scenarios | `lab_troubleshooting.md` | ✅ | `module4/troubleshoot/` (`break` / `check` / `reset`, `scenarios/1-7`), on WordPress as module 2 left it (`network/step2-gateway`), attendee's own rights. Ported from Bookinfo: 1 password rotated in the Secret only, 2 Service selector, 3 missing image tag, 4 liveness probe, 5 quota-stuck rollout, 6 DNS blocked by a NetworkPolicy, 7 StatefulSet on a missing StorageClass. Patches pass a server dry-run; not run end to end yet |
 
 ### Module 5 — Kubernetes cluster security
 

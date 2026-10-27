@@ -1,8 +1,9 @@
-symptom="every box of the page says its service is unavailable"
+symptom="the blog says \"Error establishing a database connection\", and nobody deployed anything"
 
 break_it() {
   # Looks like a sensible egress lockdown: anything in the cluster except
-  # the system namespace. The cluster DNS lives there.
+  # the system namespace. The cluster DNS lives there: WordPress can no
+  # longer resolve `mysql`.
   cat <<YAML | $K apply -f - >/dev/null
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -20,9 +21,8 @@ YAML
 }
 
 check_it() {
-  $K exec deploy/productpage-v1 -c productpage -- \
-    python -c 'import socket; socket.gethostbyname("details")' >/dev/null 2>&1 \
-    && page_ok 5
+  $K exec deploy/wordpress -c wordpress -- getent hosts mysql >/dev/null 2>&1 \
+    && blog_ok
 }
 
 fix_it() { $K delete networkpolicy egress-in-cluster-only --ignore-not-found >/dev/null; }

@@ -3,9 +3,10 @@
 **Slides:** *Troubleshooting*, then *Lab — troubleshooting* · **~60 min**
 
 Faults you did not inject, found with a method — **symptom, scope, layer**
-— and the tool of each layer. The patient is your namespace as module 3
-left it: Bookinfo at `module3/harden/step4-spread`, WordPress back with its
-data. Every path below is relative to `module4/`.
+— and the tool of each layer. The patient is your namespace as module 2
+left it: WordPress, MySQL as a StatefulSet with its data, the toolbox, the
+Ingress and the HTTPRoute (`module2/network/step2-gateway`). Every path
+below is relative to `module4/`.
 
 ```sh
 export NS=<your-namespace>
@@ -25,32 +26,36 @@ troubleshoot/check 1      # fixed yet?
 - For each command you run, write down **what it ruled out**.
 - Everything happens in your namespace, with your own rights: no
   scenario needs the platform team, but some fixes are trade-offs worth
-  discussing (5).
+  discussing (1, 5).
+- Three scenarios show the **same message** on the blog. That is the
+  point: the message says where it hurts, not where it broke.
 
 | Group | # | What you are told | Tools that find it |
 | --- | --- | --- | --- |
-| Application | 1 | the black stars are gone from the page | which version fails, `logs`, the Deployment's `env` |
-| Network | 2 | the page does not answer at all | `describe ingress`, `describe svc`, `get endpointslices` |
-| | 6 | every box of the page says its service is unavailable | `kubectl debug` + `nslookup`, `get networkpolicy` |
-| Kubernetes objects | 3 | a new version of reviews-v3 is still not live | `rollout status`, `get pods`, `describe pod`, `rollout history` |
-| | 4 | the stars come and go, ratings keeps restarting | `get pods` (RESTARTS), `describe pod` events, `logs --previous` |
-| | 5 | reviews-v2 still runs with its old memory setting | `rollout status`, the **ReplicaSet**'s events, `describe quota` |
-| Storage | 7 | the blog lost its database since MySQL moved to faster storage | `describe pod`, `describe pvc`, `get sc`, then **which** claim |
+| Application | 1 | "Error establishing a database connection" since WordPress was restarted this morning | `rollout history`, the Deployment's `env`, the Secret, `kubectl exec` into MySQL with each password |
+| Network | 2 | the blog does not answer at all | `curl -I`, `describe ingress`, `describe svc`, `get endpointslices` |
+| | 6 | "Error establishing a database connection", and nobody deployed anything | `kubectl exec` + `getent hosts mysql`, the toolbox's `nslookup`, `get networkpolicy` |
+| Kubernetes objects | 3 | a new WordPress image is still not live | `rollout status`, `get pods`, `describe pod`, `rollout history` |
+| | 4 | the blog keeps going down, the pod keeps restarting | `get pods` (RESTARTS), `describe pod` events, `logs --previous` |
+| | 5 | WordPress still runs with its old memory setting | `rollout status`, the **ReplicaSet**'s events, `describe quota` |
+| Storage | 7 | "Error establishing a database connection" since MySQL moved to faster storage | `get pods`, `describe pod`, `describe pvc`, `get sc`, then **which** claim |
 
-Fast pairs: 5 and 7 have a second trap in the fix.
+Fast pairs: 1, 5 and 7 have a second trap in the fix.
 
 ## Tools you may not have used yet
 
 ```sh
 # a shell with network tools next to a container that has none
-kubectl -n "$NS" debug -it deploy/productpage-v1 --image=nicolaka/netshoot \
-  --target=productpage -- bash
+kubectl -n "$NS" debug -it deploy/wordpress --image=nicolaka/netshoot \
+  --target=wordpress -- bash
 # the refusals that never reach a pod
-kubectl -n "$NS" describe rs -l app=reviews
+kubectl -n "$NS" describe rs -l app=wordpress
 kubectl -n "$NS" describe resourcequota trainee
 # what changed
-kubectl -n "$NS" rollout history deploy/<name>
+kubectl -n "$NS" rollout history deploy/wordpress
 kubectl -n "$NS" get events --sort-by=.lastTimestamp
+# ask the database itself
+kubectl -n "$NS" exec -it mysql-0 -- mysql -uwordpress -p
 ```
 
 On a local kind cluster instead of the shared one:
@@ -59,30 +64,38 @@ On a local kind cluster instead of the shared one:
 ## Debrief
 
 For one scenario per pair: the first symptom, each command and what it
-ruled out, the cause, the fix — and the shortest path in hindsight.
+ruled out, the cause, the fix — and the shortest path in hindsight. Then
+1, 6 and 7 side by side: one message, three layers.
 
 ## For the trainer
 
 Causes:
 
-1. `RATINGS_SERVICE_PORT=9081` on reviews-v2: half of the reviews pods
-   cannot reach ratings. Only v2 shows black stars, so "stars gone" is
-   one version, not the whole service.
-2. `productpage` Service selector `app: product-page`: no endpoints,
-   Traefik answers 503.
-3. reviews-v3 image tag `1.20.30` does not exist: ImagePullBackOff on the
-   new pod, the old one keeps serving. Fix: `rollout undo`.
-4. ratings liveness probe on port 9081: the pod is Ready, then killed
-   every ~30 s, then CrashLoopBackOff. Events say `Liveness probe failed`.
-5. reviews-v2 memory raised just above what the quota has left: the
-   surge pod is refused (ReplicaSet events, `exceeded quota`), and with 2
-   replicas `maxUnavailable` rounds down to 0. Fixes, each a trade-off:
-   free quota (scale WordPress down), `maxSurge: 0` / `maxUnavailable: 1`
-   (one replica during the rollout), or ask for a bigger quota. Deleting
-   the PDB does nothing: a PDB does not govern rollouts.
-6. NetworkPolicy allowing egress everywhere except `kube-system`: no DNS.
-   Needs NetworkPolicy enforcement by the CNI (kindnet does it since kind
-   0.24: check on the cluster before the session).
+1. The Secret's `password` changed, then `rollout restart deploy/wordpress`.
+   MySQL still has the old password: it reads `MYSQL_PASSWORD` only when
+   it initialises an empty data directory (the module 1 WordPress
+   question), and its data is on the claim since module 2. Two fixes: put
+   the old password back in the Secret (from the attendee's `db.env`) and
+   restart WordPress; or keep the new one and change MySQL's
+   (`ALTER USER CURRENT_USER() IDENTIFIED BY '…'`, logged in with the old
+   one) — the rotation done right. Second trap: fixing the Secret without
+   restarting WordPress changes nothing (env vars are read at start).
+2. `wordpress` Service selector `app: word-press`: no endpoints, Traefik
+   answers 503 on both host names.
+3. Image tag `wordpress:6.80-apache` does not exist: ImagePullBackOff on
+   the new pod, the old one keeps serving. Fix: `rollout undo`.
+4. Liveness probe on port 8080: the pod serves, then is killed every
+   ~30 s, then CrashLoopBackOff. Events say `Liveness probe failed`. Fix:
+   remove the probe, or point it at port 80.
+5. WordPress memory raised just above what the quota has left: the surge
+   pod is refused (ReplicaSet events, `exceeded quota`), and with one
+   replica `maxUnavailable` rounds down to 0. Fixes, each a trade-off: a
+   value that fits, `maxSurge: 0` / `maxUnavailable: 1` (the old pod goes
+   first, then the new one fits — at the cost of a short outage), or ask
+   for a bigger quota.
+6. NetworkPolicy allowing egress everywhere except `kube-system`: no DNS,
+   WordPress cannot resolve `mysql`. Needs NetworkPolicy enforcement by
+   the CNI (kindnet does on the shared cluster).
 7. StatefulSet `mysql` recreated with claim template `fast` on
    StorageClass `fast` (does not exist): claim `fast-mysql-0` Pending,
    `mysql-0` Pending. Fixing only the class gives an empty volume:
@@ -91,12 +104,14 @@ Causes:
    re-apply the StatefulSet (`module2/storage/step3-statefulset`), which
    picks up `data-mysql-0` again; then delete `fast-mysql-0`.
 
-`check` loads the page through the Ingress, from wherever it runs (the web
-console): a 200 is not enough, it also looks for productpage's
-"currently unavailable" apologies. Scenario 4's `check` waits 45 s to see
-whether ratings still restarts.
+`check` loads the blog's home page through the Ingress, from wherever it
+runs (the web console): a 200 with WordPress's own content, not its
+database error page and not its installer. Scenario 4's `check` waits 45 s
+to see whether WordPress still restarts. Scenario 1 keeps the original
+password in `troubleshoot/.state/` (git-ignored) so that `reset` can put
+both sides back, whichever fix was chosen.
 
-Not verified on the shared cluster yet: the whole set, in particular 6
-(kindnet enforcement) and 5 (the quota margin depends on how much memory
-each attendee gave ratings in module 3; `break` computes it from the
-quota's status).
+Not verified on the shared cluster yet: the whole set, in particular 1
+(that MySQL 8.4 lets the user change its own password) and 5 (the quota
+margin is computed at `break` time from the quota's status: run it on a
+quiet namespace).

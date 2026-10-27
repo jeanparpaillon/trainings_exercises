@@ -1,57 +1,62 @@
 # Shared by break, check, reset and the scenarios. Not for you to run.
-# Needs only what the web console has: bash, kubectl, curl, sed.
+# Needs only what the web console has: bash, kubectl, curl, sed, base64.
 set -euo pipefail
 NS=${NS:?export NS=<your-namespace> first}
 # Host suffix of the Ingresses: the shared cluster's by default; on a local
 # kind cluster, export NIP=127.0.0.1.nip.io.
 NIP=${NIP:-195.35.2.222.nip.io}
 K="kubectl -n $NS"
-PAGE=http://bookinfo.$NS.$NIP/productpage
 BLOG=http://wordpress.$NS.$NIP/
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-module3=$here/../../module3
-storage=$here/../../module2/storage
+module1=$here/../../module1
+module2=$here/../../module2
+storage=$module2/storage
+# What a scenario must remember to undo itself (git-ignored).
+state=$here/.state
+mkdir -p "$state"
 
 die() { echo "$*" >&2; exit 1; }
 
-# N page loads; fails if any is not a 200 with every box shown, or takes
-# longer than MAX seconds. productpage answers 200 with an apology when a
-# dependency fails: the status code alone says nothing.
-page_ok() {
-  local n=${1:-20} max=${2:-3} i out code t
+# N loads of the blog's home page through the Ingress; fails on anything
+# but WordPress's own content: an error page ("Error establishing a
+# database connection" is a 500), a redirect to the installer (an empty
+# database), a Traefik 404 / 502 / 503, or more than MAX seconds.
+blog_ok() {
+  local n=${1:-5} max=${2:-5} i out code t
   for i in $(seq "$n"); do
-    out=$(curl -s -m 10 -w '\n%{http_code} %{time_total}' "$PAGE") || return 1
-    read -r code t <<<"$(tail -n1 <<<"$out")"
+    out=$(curl -s -m 10 -w '\n%{http_code} %{time_total} %{redirect_url}' "$BLOG") || return 1
+    read -r code t _ <<<"$(tail -n1 <<<"$out")"
     [ "$code" = 200 ] || return 1
     awk -v t="$t" -v m="$max" 'BEGIN { exit !(t <= m) }' || return 1
-    grep -q 'currently unavailable\|Error fetching' <<<"$out" && return 1
+    grep -q 'Error establishing a database connection\|install\.php' <<<"$out" && return 1
   done
   return 0
 }
 
-# WordPress answers with its own content: not a database error, and not a
-# redirect to the installer (an empty database).
-blog_ok() {
-  local out
-  out=$(curl -s -m 10 -w '\n%{http_code} %{redirect_url}' "$BLOG") || return 1
-  grep -q 'Error establishing a database connection' <<<"$out" && return 1
-  grep -q 'install\.php' <<<"$(tail -n1 <<<"$out")" && return 1
-  grep -q '^200 \|^30[12] ' <<<"$(tail -n1 <<<"$out")"
-}
-
-# Every Deployment rolled out.
+# Every Deployment and StatefulSet rolled out.
 rolled_out() {
   local d
-  for d in $($K get deploy -o name); do
+  for d in $($K get deploy,sts -o name); do
     $K rollout status "$d" --timeout="${1:-5s}" >/dev/null 2>&1 || return 1
   done
 }
 
-# Sum of a deployment's container restarts.
+# Sum of a workload's container restarts, by app label.
 restarts() {
   $K get pods -l app="$1" \
     -o jsonpath='{range .items[*]}{range .status.containerStatuses[*]}{.restartCount}{"\n"}{end}{end}' \
     | awk '{ s += $1 } END { print s + 0 }'
+}
+
+# Does this password open MySQL for the `wordpress` user?
+mysql_pw_ok() {
+  $K exec mysql-0 -c mysql -- env MYSQL_PWD="$1" \
+    mysql -uwordpress -e 'SELECT 1' >/dev/null 2>&1
+}
+
+# The password currently in the Secret.
+secret_pw() {
+  $K get secret wordpress-db -o jsonpath='{.data.password}' | base64 -d
 }
 
 # A quantity (1968Mi, 2Gi, 2063597568, 512M…) in MiB, rounded up.
