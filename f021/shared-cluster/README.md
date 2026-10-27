@@ -147,7 +147,7 @@ Per lab of the eight-module program (see [`../README.md`](../README.md)).
 | 3 · autoscale | metrics-server, VPA recommender, prometheus-adapter (`requests_per_second`) | installed |
 | 3 · autoscale, step "HPA on request rate" | Bookinfo meshed (Linkerd proxies export `request_total`) | Linkerd installed; the step injects the namespace |
 | 3 · harden, step "spread and budgets" | several nodes to drain | **single node**: trainer demo on kind |
-| 4 · monitoring | kube-prometheus-stack, Grafana logins, ServiceMonitor / PrometheusRule rights | installed |
+| 4 · monitoring | kube-prometheus-stack, Grafana logins (Editor), ServiceMonitor / PodMonitor / PrometheusRule rights, dashboards from ConfigMaps in any namespace, **Traefik scraped** (PodMonitor `traefik/traefik`, `infrastructure/configs/traefik-metrics.yaml`) | installed; Traefik's PodMonitor to push, then **check** `count(traefik_service_requests_total)` in Explore |
 | 4 · logging | a log stack (Loki + an agent) | **not installed**: `kubectl logs` only, or add it here |
 | 4 · troubleshooting | namespace-level faults only (`module4/troubleshoot/`), run with the trainee's rights; scenario 6 needs NetworkPolicy enforcement | nothing to install |
 | 5 · least privilege | starting from `trainee` rights | installed |

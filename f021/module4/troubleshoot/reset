@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# troubleshoot/reset — undo every scenario: back to the end of module 2
-# (WordPress, MySQL as a StatefulSet with its data, toolbox, HTTPRoute, no
+# troubleshoot/reset — undo every scenario: back to the end of the
+# monitoring lab (WordPress and MySQL with its data as module 2 left them,
+# plus loadgen, the MySQL exporter, your alerts and dashboard; no
 # NetworkPolicy).
 source "$(dirname "$0")/lib.sh"
 for f in "$here"/scenarios/*.sh; do
@@ -9,10 +10,14 @@ done
 # Leftovers of the module 2 network lab would block everything below.
 $K delete networkpolicy default-deny allow-dns allow-from-traefik \
   allow-wordpress-to-mysql allow-mysql-from-wordpress --ignore-not-found >/dev/null
-$K apply -k "$module2/network/step2-gateway" >/dev/null
+# The monitoring lab's rendered files, if it was skipped.
+for t in step3-alerts/prometheusrule step4-dashboard/dashboard; do
+  [ -f "$monitoring/$t.yaml" ] || sed "s/CHANGEME/$NS/g" "$monitoring/$t.yaml.tmpl" > "$monitoring/$t.yaml"
+done
+$K apply -k "$monitoring/step4-dashboard" >/dev/null
 rolled_out 300s || die "a rollout is still stuck: kubectl -n $NS get pods, then ask the trainer"
 if blog_ok; then
-  echo "Your namespace is back to the end of module 2."
+  echo "Your namespace is back to the end of the monitoring lab."
 else
   die "still not healthy: ask the trainer"
 fi

@@ -1,0 +1,84 @@
+# Your dashboard, as a manifest next to the application. Render it into
+# dashboard.yaml (git-ignored), which the kustomization uses:
+#
+#   sed "s/CHANGEME/$NS/g" monitoring/step4-dashboard/dashboard.yaml.tmpl \
+#     > monitoring/step4-dashboard/dashboard.yaml
+#
+# Grafana's sidecar watches ConfigMaps labelled grafana_dashboard: "1" in
+# every namespace and loads their JSON. The uid and title carry your
+# namespace: the whole room shares one Grafana. A dashboard loaded this
+# way cannot be saved from the UI — change the file, apply, it reloads.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wordpress-dashboard
+  labels:
+    grafana_dashboard: "1"
+data:
+  wordpress-CHANGEME.json: |
+    {
+      "uid": "wordpress-CHANGEME",
+      "title": "WordPress — CHANGEME",
+      "tags": ["f021", "CHANGEME"],
+      "timezone": "browser",
+      "schemaVersion": 39,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "panels": [
+        {
+          "type": "timeseries", "title": "Blog requests / s, by status (Traefik)",
+          "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+          "targets": [ { "refId": "A", "legendFormat": "{{code}}",
+            "expr": "sum by (code) (rate(traefik_service_requests_total{service=\"CHANGEME-wordpress-80@kubernetes\"}[1m]))" } ]
+        },
+        {
+          "type": "timeseries", "title": "Blog latency p95 (Traefik)",
+          "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+          "targets": [ { "refId": "A", "legendFormat": "p95",
+            "expr": "histogram_quantile(0.95, sum by (le) (rate(traefik_service_request_duration_seconds_bucket{service=\"CHANGEME-wordpress-80@kubernetes\"}[5m])))" } ]
+        },
+        {
+          "type": "timeseries", "title": "MySQL connections",
+          "gridPos": { "x": 0, "y": 8, "w": 8, "h": 8 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [ { "refId": "A", "legendFormat": "connected",
+            "expr": "mysql_global_status_threads_connected{namespace=\"CHANGEME\"}" } ]
+        },
+        {
+          "type": "timeseries", "title": "MySQL queries / s",
+          "gridPos": { "x": 8, "y": 8, "w": 8, "h": 8 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "qps" }, "overrides": [] },
+          "targets": [ { "refId": "A", "legendFormat": "queries",
+            "expr": "rate(mysql_global_status_queries{namespace=\"CHANGEME\"}[1m])" } ]
+        },
+        {
+          "type": "stat", "title": "MySQL up",
+          "gridPos": { "x": 16, "y": 8, "w": 8, "h": 8 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [ { "refId": "A", "expr": "mysql_up{namespace=\"CHANGEME\"}" } ]
+        },
+        {
+          "type": "timeseries", "title": "Memory per pod (working set) vs limit",
+          "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+          "targets": [
+            { "refId": "A", "legendFormat": "{{pod}}",
+              "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"CHANGEME\", container!=\"\"})" },
+            { "refId": "B", "legendFormat": "{{pod}} limit",
+              "expr": "sum by (pod) (kube_pod_container_resource_limits{namespace=\"CHANGEME\", resource=\"memory\"})" } ]
+        },
+        {
+          "type": "timeseries", "title": "Container restarts (last hour)",
+          "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [ { "refId": "A", "legendFormat": "{{pod}} / {{container}}",
+            "expr": "increase(kube_pod_container_status_restarts_total{namespace=\"CHANGEME\"}[1h])" } ]
+        }
+      ]
+    }

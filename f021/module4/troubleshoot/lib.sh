@@ -11,6 +11,7 @@ here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 module1=$here/../../module1
 module2=$here/../../module2
 storage=$module2/storage
+monitoring=$here/../monitoring
 # What a scenario must remember to undo itself (git-ignored).
 state=$here/.state
 mkdir -p "$state"

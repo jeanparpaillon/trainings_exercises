@@ -3,10 +3,12 @@
 **Slides:** *Troubleshooting*, then *Lab — troubleshooting* · **~60 min**
 
 Faults you did not inject, found with a method — **symptom, scope, layer**
-— and the tool of each layer. The patient is your namespace as module 2
-left it: WordPress, MySQL as a StatefulSet with its data, the toolbox, the
-Ingress and the HTTPRoute (`module2/network/step2-gateway`). Every path
-below is relative to `module4/`.
+— and the tool of each layer. The patient is your namespace as the
+monitoring lab left it (`monitoring/step4-dashboard`): WordPress, MySQL as
+a StatefulSet with its data and its exporter, the toolbox, the loadgen,
+the Ingress and the HTTPRoute — **and your alerts and dashboard**: keep
+Grafana open, and note which alert fired, when, and whether it pointed at
+the cause. Every path below is relative to `module4/`.
 
 ```sh
 export NS=<your-namespace>
@@ -65,7 +67,10 @@ On a local kind cluster instead of the shared one:
 
 For one scenario per pair: the first symptom, each command and what it
 ruled out, the cause, the fix — and the shortest path in hindsight. Then
-1, 6 and 7 side by side: one message, three layers.
+1, 6 and 7 side by side: one message, three layers. And for each: which of
+your alerts fired, how long after the fault, and did any of them point at
+the cause? (`MySQLLoginFailures` does for 1; nothing does for 3 and 5 —
+the old pod keeps serving.)
 
 ## For the trainer
 
@@ -101,8 +106,11 @@ Causes:
    `mysql-0` Pending. Fixing only the class gives an empty volume:
    WordPress redirects to its installer, and `check` refuses it. The fix
    is the original template (`data`, `standard`), i.e. delete and
-   re-apply the StatefulSet (`module2/storage/step3-statefulset`), which
-   picks up `data-mysql-0` again; then delete `fast-mysql-0`.
+   re-apply the StatefulSet — `kubectl apply -k monitoring/step4-dashboard`
+   keeps the exporter; `module2/storage/step3-statefulset` does not, and
+   `MySQLDown` keeps firing on the absent exporter: a fix that drops the
+   monitoring — which picks up `data-mysql-0` again; then delete
+   `fast-mysql-0`.
 
 `check` loads the blog's home page through the Ingress, from wherever it
 runs (the web console): a 200 with WordPress's own content, not its

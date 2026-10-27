@@ -1,0 +1,7 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# WordPress as module 2 left it, plus steady traffic so the graphs move.
+resources:
+  - ../../../module2/network/step2-gateway
+  - loadgen.yaml

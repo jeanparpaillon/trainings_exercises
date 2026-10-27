@@ -5,4 +5,5 @@ resources:
   - traefik-strip-prefix.yaml
   - linkerd-dashboard.yaml
   - linkerd-scrape.yaml
+  - traefik-metrics.yaml
   - rbac

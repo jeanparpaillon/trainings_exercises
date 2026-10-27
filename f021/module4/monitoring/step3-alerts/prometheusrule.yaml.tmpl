@@ -1,0 +1,64 @@
+# Your alerts, as a manifest next to the application. Render it into
+# prometheusrule.yaml (git-ignored), which the kustomization uses:
+#
+#   sed "s/CHANGEME/$NS/g" monitoring/step3-alerts/prometheusrule.yaml.tmpl \
+#     > monitoring/step3-alerts/prometheusrule.yaml
+#
+# Every expression names your namespace: a rule sees every series of the
+# cluster, so without it your alert would fire for the whole room.
+#
+# Two kinds, on purpose:
+#   severity: page    what the USERS feel (the blog fails, or is gone):
+#                     somebody must act now
+#   severity: ticket  a CAUSE (MySQL down, failed logins): worth a look,
+#                     not a 3 a.m. call — if users suffer, a page fires anyway
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: wordpress
+spec:
+  groups:
+    - name: wordpress-CHANGEME
+      rules:
+        # The symptom: more than 5 % of the blog's requests fail, measured
+        # by Traefik at the edge — no code in WordPress for that.
+        - alert: WordPressErrorRate
+          expr: |
+            sum(rate(traefik_service_requests_total{service="CHANGEME-wordpress-80@kubernetes", code=~"5.."}[5m]))
+              /
+            sum(rate(traefik_service_requests_total{service="CHANGEME-wordpress-80@kubernetes"}[5m]))
+              > 0.05
+          for: 2m
+          labels:
+            severity: page
+            namespace: CHANGEME
+          annotations:
+            summary: "Blog of CHANGEME: {{ $value | humanizePercentage }} of requests fail"
+        # The other symptom: no WordPress pod to answer at all.
+        - alert: WordPressUnavailable
+          expr: kube_deployment_status_replicas_available{namespace="CHANGEME", deployment="wordpress"} < 1
+          for: 1m
+          labels:
+            severity: page
+          annotations:
+            summary: "Blog of CHANGEME: no WordPress pod available"
+        # A cause. `absent()` too: when the MySQL pod is gone, so is its
+        # exporter, and mysql_up has no series at all — `== 0` alone would
+        # stay silent exactly when it matters.
+        - alert: MySQLDown
+          expr: |
+            (mysql_up{namespace="CHANGEME"} == 0)
+              or
+            absent(mysql_up{namespace="CHANGEME"})
+          for: 1m
+          labels:
+            severity: ticket
+          annotations:
+            summary: "MySQL of CHANGEME is down, or its exporter is"
+        # Another cause: logins refused (wrong password, a scan…).
+        - alert: MySQLLoginFailures
+          expr: increase(mysql_global_status_aborted_connects{namespace="CHANGEME"}[5m]) > 2
+          labels:
+            severity: ticket
+          annotations:
+            summary: "MySQL of CHANGEME refused {{ $value | humanize }} logins in 5 min"

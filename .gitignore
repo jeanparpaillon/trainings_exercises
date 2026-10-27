@@ -7,5 +7,7 @@
 # The attendee's own manifests of the first-deployment lab.
 /f021/module1/first-deploy/k8s/
 /f021/module2/network/step2-gateway/httproute.yaml
+/f021/module4/monitoring/step3-alerts/prometheusrule.yaml
+/f021/module4/monitoring/step4-dashboard/dashboard.yaml
 # What the troubleshooting scenarios remember to undo themselves.
 /f021/module4/troubleshoot/.state/

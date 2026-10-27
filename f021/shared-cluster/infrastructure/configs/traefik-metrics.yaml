@@ -1,0 +1,27 @@
+# Needs the PodMonitor CRD of kube-prometheus-stack: infra-configs runs after infra-controllers.
+#
+# Traefik's own metrics in the kube-prometheus-stack Prometheus: requests,
+# status codes and latency per backend Service, for every trainee's
+# Ingress and HTTPRoute — the RED of their application, measured at the
+# edge with no code change (module 4 monitoring lab). The chart already
+# serves them (`--metrics.prometheus`, entrypoint `metrics` on :9100, not
+# published by the Service): only the scrape was missing, so this needs no
+# Traefik restart.
+#
+# Series per backend: traefik_service_requests_total{service, code, method},
+# traefik_service_request_duration_seconds_bucket{service, code, le}, where
+# service is "<ns>-<svc>-<port>@kubernetes" for an Ingress and
+# "httproute-<ns>-<route>-…@kubernetesgateway" for an HTTPRoute.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: traefik
+  namespace: traefik
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: traefik
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s

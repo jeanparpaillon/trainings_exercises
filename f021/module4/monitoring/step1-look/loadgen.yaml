@@ -1,0 +1,45 @@
+# Steady traffic on the blog, two requests per second, THROUGH TRAEFIK:
+# the same URL as your browser, so that what Traefik measures at the edge
+# (step 2) moves too. The namespace comes from the pod itself.
+#
+# Quiet the namespace:  kubectl -n "$NS" scale deploy/loadgen --replicas=0
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loadgen
+  labels:
+    app: loadgen
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: loadgen
+  template:
+    metadata:
+      labels:
+        app: loadgen
+    spec:
+      containers:
+        - name: loadgen
+          image: busybox:1.37
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: NS
+              valueFrom:
+                fieldRef: { fieldPath: metadata.namespace }
+            - name: BLOG
+              value: http://wordpress.$(NS).195.35.2.222.nip.io/
+          command:
+            - sh
+            - -c
+            - |
+              while true; do
+                wget -q -T 10 -O /dev/null "$BLOG" || echo "$(date -u +%T) request failed"
+                sleep 0.5
+              done
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 32Mi

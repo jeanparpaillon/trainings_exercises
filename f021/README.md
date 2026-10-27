@@ -107,10 +107,10 @@ Legend: ✅ reuse as is · ✏️ update · 🆕 new
 
 ### Module 4 — Monitoring, logging and troubleshooting
 
-No monitoring lab: the audience is developers, Grafana / Prometheus are shown in a trainer demo (last slide of `monitoring.md`), using Bookinfo from `module3/harden/`.
 
 | Lab | Slides | Status | Material |
 | --- | --- | --- | --- |
+| Monitoring your application (look, exporter and edge metrics, alerts, dashboard as code) | `lab_monitoring.md` | 🆕 | `module4/monitoring/` step1-look … step4-dashboard, on WordPress (`module2/network/step2-gateway`): loadgen through Traefik, mysqld-exporter sidecar + PodMonitor, PrometheusRule and dashboard ConfigMap rendered per namespace. Needs the platform PodMonitor `traefik/traefik` for the edge metrics. Exporter checked locally (Docker); manifests and PromQL checked on the cluster (dry-run, queries); not run end to end yet |
 | Troubleshooting scenarios | `lab_troubleshooting.md` | ✅ | `module4/troubleshoot/` (`break` / `check` / `reset`, `scenarios/1-7`), on WordPress as module 2 left it (`network/step2-gateway`), attendee's own rights. Ported from Bookinfo: 1 password rotated in the Secret only, 2 Service selector, 3 missing image tag, 4 liveness probe, 5 quota-stuck rollout, 6 DNS blocked by a NetworkPolicy, 7 StatefulSet on a missing StorageClass. Patches pass a server dry-run; not run end to end yet |
 
 ### Module 5 — Kubernetes cluster security

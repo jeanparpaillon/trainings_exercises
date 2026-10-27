@@ -1,0 +1,17 @@
+# Tells Prometheus to scrape the exporter: every pod labelled app=mysql in
+# this namespace, on its container port named `metrics`. The Prometheus of
+# the shared cluster picks up every PodMonitor / ServiceMonitor, no label
+# needed. Each series gets the target's namespace, pod and container.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: mysql
+  labels:
+    app: mysql
+spec:
+  selector:
+    matchLabels:
+      app: mysql
+  podMetricsEndpoints:
+    - port: metrics
+      interval: 30s

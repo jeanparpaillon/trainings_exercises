@@ -1,0 +1,8 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# End state of the lab, and starting state of the troubleshooting lab: your
+# alerts and dashboard stay on while you troubleshoot.
+resources:
+  - ../step3-alerts
+  - dashboard.yaml
