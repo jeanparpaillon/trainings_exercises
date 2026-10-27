@@ -96,7 +96,7 @@ Legend: ✅ reuse as is · ✏️ update · 🆕 new
 | Lab | Slides | Status | Material |
 | --- | --- | --- | --- |
 | Persistent storage, scale-up, StatefulSet | `lab_storage.md` | ✅ | `module2/storage/` step1-pvc, step2-scale, step3-statefulset, on top of `module1/wordpress/step2-config` |
-| Expose and reach your application (DNS, HTTPRoute, break it, default deny) | `lab_network.md` | ✅ | `module2/network/` step1-dns … step4-netpol, on Bookinfo. Shared Gateway needs the Gateway API CRDs at Traefik's version (v1.6.3: with v1.4 the GatewayClass is never accepted). Still to run end to end: HTTPRoute accepted, default deny enforced by kindnet |
+| Expose and reach your application (DNS, HTTPRoute, break it, default deny) | `lab_network.md` | ✅ | `module2/network/` step1-dns … step4-netpol, on WordPress (`storage/step3-statefulset` + a busybox toolbox); allow policies scoped to WordPress → MySQL and Traefik → WordPress. Shared Gateway needs the Gateway API CRDs at Traefik's version (v1.6.3: with v1.4 the GatewayClass is never accepted). Still to run end to end: HTTPRoute accepted, default deny enforced by kindnet |
 
 ### Module 3 — Scaling and high availability
 

@@ -1,4 +1,4 @@
-# Bookinfo again, through Gateway API instead of the Ingress of module 1,
+# WordPress again, through Gateway API instead of the Ingress of module 1,
 # on a second host name. Render it into httproute.yaml (git-ignored):
 #
 #   sed "s/CHANGEME/$NS/g" network/step2-gateway/httproute.yaml.tmpl \
@@ -9,20 +9,13 @@
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: bookinfo
+  name: wordpress
 spec:
   parentRefs:
-    - name: traefik-gateway
-      namespace: traefik
+    - { name: traefik-gateway, namespace: traefik }
   hostnames:
-    - bookinfo-gw.CHANGEME.195.35.2.222.nip.io
+    - wordpress-gw.CHANGEME.195.35.2.222.nip.io
+  # No `matches`: the default is every path (PathPrefix /).
   rules:
-    - matches:
-        - path: { type: PathPrefix, value: /productpage }
-        - path: { type: PathPrefix, value: /static }
-        - path: { type: PathPrefix, value: /login }
-        - path: { type: PathPrefix, value: /logout }
-        - path: { type: PathPrefix, value: /api/v1/products }
-      backendRefs:
-        - name: productpage
-          port: 9080
+    - backendRefs:
+        - { name: wordpress, port: 80 }

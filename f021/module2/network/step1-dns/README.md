@@ -2,9 +2,10 @@
 
 **Slide:** Lab — network: names · **~15 min**
 
-No manifest: the `toolbox` pod of module 1 is enough.
+Adds a `toolbox` pod (a busybox shell) next to WordPress and MySQL.
 
 ```sh
+kubectl -n "$NS" apply -k network/step1-dns
 kubectl -n "$NS" exec -it deploy/toolbox -- sh
 ```
 
@@ -12,39 +13,51 @@ Inside the pod:
 
 ```sh
 cat /etc/resolv.conf                         # search list, ndots:5
-nslookup productpage                         # short name
-nslookup productpage.$NS                     # <svc>.<ns>
-nslookup productpage.$NS.svc.cluster.local   # FQDN
-nslookup mysql-0.mysql-headless              # one pod of a StatefulSet (module 2 storage)
-wget -qO- http://productpage:9080/api/v1/products | head -c 200
+nslookup wordpress                           # short name
+nslookup wordpress.$NS                       # <svc>.<ns>
+nslookup wordpress.$NS.svc.cluster.local     # FQDN
+nslookup mysql                               # ClusterIP: one virtual IP
+nslookup mysql-headless                      # headless: the pod IP itself
+nslookup mysql-0.mysql-headless              # one pod of the StatefulSet, by name
+wget -qO- http://wordpress/ | grep -o '<title>.*</title>'
+nc -w 3 mysql 3306 | head -c 40; echo        # MySQL greets you with its version
 ```
 
 `$NS` is not set inside the pod: type your namespace.
 
 ## Another namespace
 
-Pick a neighbour's namespace (`kubectl get ns`) and call their Bookinfo:
+Pick a neighbour's namespace (`kubectl get ns`) and call their WordPress —
+then their **database**:
 
 ```sh
-wget -qO- -T 3 http://productpage.<their-ns>:9080/api/v1/products | head -c 200
+wget -qO- -T 3 http://wordpress.<their-ns>/ | grep -o '<title>.*</title>'
+nc -w 3 mysql.<their-ns> 3306 | head -c 40; echo
 ```
 
-It answers: the pod network is flat, and a namespace separates **names**,
-not **traffic**. Step 4 changes that for your namespace.
+Both answer: the pod network is flat, and a namespace separates **names**,
+not **traffic**. Anyone in the cluster can open a connection to your
+database; only its password stands in the way. Step 4 changes that for
+your namespace.
 
 ## Endpoints
 
 Out of the pod:
 
 ```sh
-kubectl -n "$NS" get endpointslices -l kubernetes.io/service-name=reviews
-kubectl -n "$NS" get pods -l app=reviews -o wide        # same IPs
+kubectl -n "$NS" scale deploy/wordpress --replicas=2
+kubectl -n "$NS" get endpointslices -l kubernetes.io/service-name=wordpress
+kubectl -n "$NS" get pods -l app=wordpress -o wide        # same IPs
+kubectl -n "$NS" scale deploy/wordpress --replicas=1
 ```
 
 ## Questions to answer before moving on
 
-- `nslookup productpage` from a pod in another namespace: what does it
-  find?
+- `nslookup wordpress` from a pod in another namespace: what does it find?
 - `nslookup www.google.com`: how many queries does the resolver send
   before the real one? (`ndots:5` and the search list)
-- What changes in the EndpointSlice when you scale `reviews-v1` to 0?
+- `mysql` and `mysql-headless` select the same pod. Why does one answer
+  with a virtual IP and the other with the pod's own address? Which one
+  does WordPress use, and why is that the right choice?
+- Your neighbour's MySQL answered. What, apart from a password, protects
+  it today?

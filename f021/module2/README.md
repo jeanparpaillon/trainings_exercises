@@ -7,7 +7,7 @@ slide it belongs to.
 | | Lab | Slides | Starts from | ~ |
 | --- | --- | --- | --- | --- |
 | [storage/](storage/) | a claim for MySQL, scale both tiers, MySQL as a StatefulSet | `lab_storage.md` | `module1/wordpress/step2-config` | 55 min |
-| [network/](network/) | names from the inside, an HTTPRoute, break it, default deny | `lab_network.md` | `module1/lab1/step3-balancing` | 70 min |
+| [network/](network/) | names from the inside, an HTTPRoute, break it, default deny | `lab_network.md` | `storage/step3-statefulset` | 70 min |
 
 Same conventions as module 1: one namespace per attendee, every command
 `kubectl -n "$NS" ...`, steps are cumulative kustomize overlays (here on
@@ -20,23 +20,24 @@ cd module2
 
 ## Starting state
 
-Both module 1 applications, as module 1 left them:
+WordPress as module 1 left it — the only application of the module: the
+storage lab continues from it, the network lab from the end of the storage
+lab.
 
 ```sh
 kubectl -n "$NS" get secret wordpress-db        # module 1 WordPress, step 2
-kubectl -n "$NS" get ingress bookinfo wordpress # your rendered Ingresses
-kubectl -n "$NS" get pods                       # Bookinfo + WordPress Running
+kubectl -n "$NS" get ingress wordpress          # your rendered Ingress
+kubectl -n "$NS" get pods                       # wordpress, mysql Running
 ```
 
 Missing something? The Secret is created by hand (module 1
-`wordpress/step2-config/README.md`), the Ingresses are rendered from their
+`wordpress/step2-config/README.md`), the Ingress is rendered from its
 `.tmpl`; then each lab's first step re-applies everything below it.
 
 ## End state — what module 3 expects
 
 ```sh
-kubectl -n "$NS" apply -k network/step2-gateway        # Bookinfo + its HTTPRoute
-kubectl -n "$NS" apply -k storage/step3-statefulset    # WordPress, MySQL as a StatefulSet
+kubectl -n "$NS" apply -k network/step2-gateway        # WordPress, MySQL StatefulSet, toolbox, HTTPRoute
 kubectl -n "$NS" get networkpolicy                     # must be empty
 kubectl -n "$NS" delete pvc data-mysql-1 --ignore-not-found
 ```

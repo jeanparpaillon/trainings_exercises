@@ -9,17 +9,17 @@ Work in pairs: one breaks, the other diagnoses.
 ```sh
 kubectl -n "$NS" apply -k network/step3-break/<selector|targetport|host>
 curl -s -o /dev/null -w '%{http_code}\n' \
-  http://bookinfo-gw.$NS.195.35.2.222.nip.io/productpage
+  http://wordpress-gw.$NS.195.35.2.222.nip.io/
 ```
 
 ## Where to look, in this order
 
 ```sh
-kubectl -n "$NS" get httproute bookinfo -o yaml        # status, hostnames
-kubectl -n "$NS" get svc productpage -o yaml           # selector, ports
-kubectl -n "$NS" get endpointslices -l kubernetes.io/service-name=productpage
-kubectl -n "$NS" get pods -l app=productpage --show-labels
-kubectl -n "$NS" exec deploy/toolbox -- wget -qO- -T 3 http://productpage:9080/productpage
+kubectl -n "$NS" get httproute wordpress -o yaml       # status, hostnames
+kubectl -n "$NS" get svc wordpress -o yaml             # selector, ports
+kubectl -n "$NS" get endpointslices -l kubernetes.io/service-name=wordpress
+kubectl -n "$NS" get pods -l app=wordpress --show-labels
+kubectl -n "$NS" exec deploy/toolbox -- wget -qO- -T 3 http://wordpress/ | head -c 200
 ```
 
 | Symptom | Likely cause |
@@ -38,5 +38,5 @@ kubectl -n "$NS" apply -k network/step2-gateway
 
 - Which of the three faults leaves the EndpointSlice empty? Which one
   doesn't, and why is it harder to spot?
-- Did the module 1 Ingress keep working during the `host` fault? During
-  the other two?
+- Did the module 1 Ingress (`wordpress.<ns>…`) keep working during the
+  `host` fault? During the other two?

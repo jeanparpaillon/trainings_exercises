@@ -6,8 +6,8 @@ resources:
 
 # A typo in the Service selector.
 patches:
-  - target: { kind: Service, name: productpage }
+  - target: { kind: Service, name: wordpress }
     patch: |-
       - op: replace
         path: /spec/selector/app
-        value: product-page
+        value: word-press

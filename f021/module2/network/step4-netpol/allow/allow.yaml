@@ -1,7 +1,8 @@
-# What the namespace needs back, and nothing more. Policies add up: each
-# one opens a flow the default-deny closed.
+# What the application needs back, and nothing more. Policies add up: each
+# one opens a flow the default-deny closed. A flow needs BOTH ends open:
+# egress on the client, ingress on the server.
 
-# DNS, to CoreDNS in kube-system.
+# DNS, to CoreDNS in kube-system, for every pod.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -19,32 +20,52 @@ spec:
         - { protocol: UDP, port: 53 }
         - { protocol: TCP, port: 53 }
 ---
-# Pods of this namespace talk to each other (productpage -> reviews, ...).
+# WordPress may call MySQL on 3306 — the client's side.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-same-namespace
+  name: allow-wordpress-to-mysql
 spec:
-  podSelector: {}
-  policyTypes: [Ingress, Egress]
-  ingress:
-    - from:
-        - podSelector: {}
+  podSelector:
+    matchLabels: { app: wordpress }
+  policyTypes: [Egress]
   egress:
     - to:
-        - podSelector: {}
+        - podSelector:
+            matchLabels: { app: mysql }
+      ports:
+        - { protocol: TCP, port: 3306 }
 ---
-# Traefik (namespace traefik) reaches productpage and wordpress only.
+# MySQL accepts WordPress, and only WordPress — the server's side. The
+# toolbox, a neighbour, anything else: refused.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-mysql-from-wordpress
+spec:
+  podSelector:
+    matchLabels: { app: mysql }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { app: wordpress }
+      ports:
+        - { protocol: TCP, port: 3306 }
+---
+# Traefik (namespace traefik) reaches WordPress on its HTTP port, for the
+# Ingress and the HTTPRoute alike.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: allow-from-traefik
 spec:
   podSelector:
-    matchExpressions:
-      - { key: app, operator: In, values: [productpage, wordpress] }
+    matchLabels: { app: wordpress }
   policyTypes: [Ingress]
   ingress:
     - from:
         - namespaceSelector:
             matchLabels: { kubernetes.io/metadata.name: traefik }
+      ports:
+        - { protocol: TCP, port: 80 }

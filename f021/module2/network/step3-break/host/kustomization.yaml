@@ -6,8 +6,8 @@ resources:
 
 # The route answers for a host name nobody calls.
 patches:
-  - target: { kind: HTTPRoute, name: bookinfo }
+  - target: { kind: HTTPRoute, name: wordpress }
     patch: |-
       - op: replace
         path: /spec/hostnames/0
-        value: bookinfo-gw.example.invalid
+        value: wordpress-gw.example.invalid
