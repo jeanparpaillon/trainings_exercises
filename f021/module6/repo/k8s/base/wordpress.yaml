@@ -1,0 +1,76 @@
+# WordPress, with our plugin baked into the image. `image: wordpress` is a
+# name, not a reference: each overlay's `images:` turns it into
+# ghcr.io/<owner>/<repo>:<tag>.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wordpress
+  labels:
+    app: wordpress
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wordpress
+  template:
+    metadata:
+      labels:
+        app: wordpress
+    spec:
+      # GHCR packages are private: the Secret `ghcr` is created by hand in the
+      # namespace (README, setup), like `wordpress-db`.
+      imagePullSecrets:
+        - name: ghcr
+      containers:
+        - name: wordpress
+          image: wordpress
+          env:
+            - name: WORDPRESS_DB_HOST
+              valueFrom:
+                configMapKeyRef: { name: wordpress, key: host }
+            - name: WORDPRESS_DB_NAME
+              valueFrom:
+                configMapKeyRef: { name: wordpress, key: database }
+            - name: WORDPRESS_DB_USER
+              valueFrom:
+                configMapKeyRef: { name: wordpress, key: user }
+            - name: WORDPRESS_DB_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: wordpress-db, key: password }
+            - name: F021_ENV
+              valueFrom:
+                configMapKeyRef: { name: wordpress, key: env }
+          ports:
+            - containerPort: 80
+              name: http
+          # Only checks that Apache listens. Is that enough? (step 6)
+          readinessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+          volumeMounts:
+            - name: html
+              mountPath: /var/www/html
+      volumes:
+        - name: html
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wordpress
+  labels:
+    app: wordpress
+spec:
+  selector:
+    app: wordpress
+  ports:
+    - port: 80
+      targetPort: http
+      name: http

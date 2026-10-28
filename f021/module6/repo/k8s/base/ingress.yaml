@@ -1,0 +1,18 @@
+# The host is the overlay's: each environment patches its own.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: wordpress
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: wordpress.example
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: wordpress
+                port:
+                  number: 80

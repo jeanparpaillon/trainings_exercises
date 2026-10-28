@@ -1,0 +1,23 @@
+# How WordPress runs on Kubernetes, the same for every environment. The
+# overlays in envs/ say where and with which image: nothing here names an
+# environment, a host or an image tag.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - mysql.yaml
+  - wordpress.yaml
+  - ingress.yaml
+
+# What is not secret. Generated (name + content hash), so that an overlay
+# can merge its own values in, and a change rolls the pods that read it.
+# The password is in the Secret `wordpress-db`, created by hand in the
+# namespace and never in git: it is not part of this kustomization, so the
+# overlays' name suffix leaves references to it alone.
+configMapGenerator:
+  - name: wordpress
+    literals:
+      - host=mysql:3306
+      - database=wordpress
+      - user=wordpress
+      - env=none

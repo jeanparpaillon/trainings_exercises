@@ -1,0 +1,39 @@
+# prod: the same base as dev, a few lines apart — the suffix and label, its
+# own MySQL and host, two replicas, and the image tag prod runs. A
+# promotion is a change of newTag here, nothing else.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../k8s/base
+
+nameSuffix: -prod
+labels:
+  - pairs:
+      env: prod
+    includeSelectors: true
+
+configMapGenerator:
+  - name: wordpress
+    behavior: merge
+    literals:
+      - env=prod
+      - host=mysql-prod:3306
+
+images:
+  - name: wordpress
+    newName: ghcr.io/GHOWNER/f021-CHANGEME
+    newTag: "0000000"   # ← the same tag as envs/dev: set it by hand
+
+replicas:
+  - name: wordpress
+    count: 2
+
+patches:
+  - target:
+      kind: Ingress
+      name: wordpress
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: wordpress.CHANGEME.195.35.2.222.nip.io

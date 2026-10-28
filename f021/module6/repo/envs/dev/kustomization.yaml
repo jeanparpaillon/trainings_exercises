@@ -1,0 +1,41 @@
+# dev: the base, with a name suffix, its own MySQL, its own host, and the
+# image tag that runs in dev. Promotion and deployment are changes to this
+# file — git log envs/dev/ is dev's deployment history.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../k8s/base
+
+# dev and prod share one namespace in this lab: every name gets -dev, and
+# every selector `env: dev`, so wordpress-dev never reaches mysql-prod.
+# (One namespace or cluster per environment in real life: then neither is
+# needed.)
+nameSuffix: -dev
+labels:
+  - pairs:
+      env: dev
+    includeSelectors: true
+
+# kustomize renames objects, not the strings inside them: the database host
+# is set here, with the suffix.
+configMapGenerator:
+  - name: wordpress
+    behavior: merge
+    literals:
+      - env=dev
+      - host=mysql-dev:3306
+
+images:
+  - name: wordpress
+    newName: ghcr.io/GHOWNER/f021-CHANGEME
+    newTag: "0000000"
+
+patches:
+  - target:
+      kind: Ingress
+      name: wordpress
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: wordpress-dev.CHANGEME.195.35.2.222.nip.io

@@ -1,0 +1,32 @@
+# Flux reports back to GitHub: a commit status per Kustomization on every
+# commit it applies, next to the Actions checks. Render and apply:
+#
+#   sed -e "s/CHANGEME/$NS/g" -e "s/GHOWNER/$OWNER/g" \
+#     $EX/module6/step7-alerts/alerts.yaml.tmpl | kubectl -n "$NS" apply -f -
+#
+# Applied by hand: like the Kustomizations, this is tenant configuration —
+# in real life it sits in the fleet repo next to them.
+apiVersion: notification.toolkit.fluxcd.io/v1beta3
+kind: Provider
+metadata:
+  name: github
+spec:
+  type: github
+  address: https://github.com/GHOWNER/f021-CHANGEME
+  # key `token`: your PAT (scope `repo` covers commit statuses)
+  secretRef:
+    name: github-token
+---
+apiVersion: notification.toolkit.fluxcd.io/v1beta3
+kind: Alert
+metadata:
+  name: wordpress
+spec:
+  providerRef:
+    name: github
+  eventSeverity: info
+  eventSources:
+    - kind: Kustomization
+      name: wordpress-dev
+    - kind: Kustomization
+      name: wordpress-prod

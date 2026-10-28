@@ -1,0 +1,56 @@
+# The manifests pipeline: on a pull request that touches the base or an
+# overlay, render every environment, validate it, and post what changes in
+# each one — reviewers read the rendered diff, not the patch.
+name: manifests
+
+on:
+  pull_request:
+    paths: ['k8s/**', 'envs/**']
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install kubeconform
+        run: |
+          curl -fsSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz \
+            | tar -xz -C "$RUNNER_TEMP" kubeconform
+
+      - name: Render and validate every environment
+        run: |
+          for env in envs/*/; do
+            echo "::group::$env"
+            kubectl kustomize "$env" | "$RUNNER_TEMP/kubeconform" -strict -summary
+            echo "::endgroup::"
+          done
+
+      - name: Rendered diff
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE: origin/${{ github.base_ref }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          git worktree add -q "$RUNNER_TEMP/base" "$BASE"
+          {
+            echo "### Rendered diff, per environment"
+            for env in envs/*/; do
+              env=${env%/}
+              echo
+              echo "<details><summary><code>$env</code></summary>"
+              echo
+              echo '```diff'
+              diff -u --label "$BASE" --label "this PR" \
+                <(kubectl kustomize "$RUNNER_TEMP/base/$env" 2>/dev/null) \
+                <(kubectl kustomize "$env") || true
+              echo '```'
+              echo "</details>"
+            done
+          } > "$RUNNER_TEMP/diff.md"
+          gh pr comment "$PR" --body-file "$RUNNER_TEMP/diff.md"

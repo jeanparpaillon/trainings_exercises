@@ -154,8 +154,7 @@ Per lab of the eight-module program (see [`../README.md`](../README.md)).
 | 5 · Pod Security | trainees label their own namespace | installed (`trainee-<name>-namespace-labels`) |
 | 5 · secrets | SOPS (client side + Flux decryption); ESO / Vault optional | SOPS needs nothing in-cluster beyond Flux; ESO, Vault **not installed** |
 | 5 · supply chain (theory) | Kyverno for verify-at-admission | **not installed**: demo only |
-| 6 · GitOps | Flux, one tenant per trainee on `$GITHUB_OWNER/f021-<name>` | installed, commented out: enabled per trainee during the lab |
-| 6 · GitOps, step "canary" | Flagger + Linkerd or Traefik metrics | **not installed**: demo, or add Flagger here |
+| 6 · GitOps | Flux, one tenant per trainee on `$GITHUB_OWNER/f021-<name>` (Kustomizations `wordpress-dev`, `wordpress-prod`); notification-controller for commit statuses | installed, commented out: enabled per trainee at step 3 (`make enable-flux`) |
 | 7 · tenants demo | cluster-admin | trainer |
 | 7 · backup demo | Velero + object storage | **not installed**: trainer demo on kind (`f021bis/module1/lab4`) |
 | 8 · game day | the module 4 faults, the module 6 pipeline | nothing to install |
@@ -282,10 +281,11 @@ then the f021bis build from `make create`.
   disabled on them): delete those by hand.
 - **Console image change**: edit `console/`, bump `CONSOLE_IMAGE` in
   `fleet.env`, `make image render`, commit, push.
-- **Module 6, a trainee's Flux tenant**: create `$GITHUB_OWNER/f021-<name>`
-  from the sample app, with the trainee as collaborator; `make deploy-keys
-  NAMES=<name>`; uncomment `<name>-flux.yaml` in `tenants/kustomization.yaml`,
-  commit, push.
+- **Module 6, a trainee's config repo and Flux tenant**: their line in
+  `secrets/github-logins`, `make config-repos deploy-keys NAMES=<name>`
+  (repo from `../module6/repo/`); at step 3 `make enable-flux NAMES=<name>`,
+  commit, push. Details in [`../module6/README.md`](../module6/README.md),
+  "Trainer".
 - **Change a chart's values**: edit the values file in
   `infrastructure/controllers/`, commit, push: the ConfigMap name changes
   with its content, which upgrades the release. `flux reconcile kustomization

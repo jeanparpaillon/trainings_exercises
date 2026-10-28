@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+# Module 6: the trainees' config repos, $GITHUB_OWNER/f021-<name>, created
+# from ../module6/repo/ (make config-repos, make protect-repos).
+#
+#   bin/config-repos [user1 user2…]            # create, before the session
+#   bin/config-repos --protect [user1 user2…]  # protect main, at step 6
+#
+# Reads secrets/github-logins (git-ignored: logins are personal), one line
+# per trainee: `<name> <github-login> <partner-name>`. Both the trainee and
+# their partner are invited with write access: a code owner (step 6) must
+# be able to write to the repo.
+#
+# Creating a repo: renders ../module6/repo/ with the trainee's namespace,
+# commits it, then sets dev's newTag to the tag the first build pushes (the
+# last commit touching app/, as .github/workflows/image.yaml computes it),
+# pushes, allows Actions to open pull requests, invites, and makes sure the
+# first image build runs. An existing repo is not recreated, but its
+# settings and invitations are applied again.
+#
+# VISIBILITY=public (default private): branch protection on a private repo
+# needs a paid plan for the owner.
+#
+# Needs `gh` logged in as $GITHUB_OWNER, with the repo, workflow and
+# delete_repo scopes (the last one only to delete them afterwards).
+set -euo pipefail
+cd "$(dirname "$0")/.."
+. ./fleet.env
+
+LOGINS=secrets/github-logins
+VISIBILITY=${VISIBILITY:-private}
+protect=false
+[ "${1:-}" = --protect ] && { protect=true; shift; }
+if [ $# -gt 0 ]; then names=("$@"); else read -ra names <<< "$TRAINEES"; fi
+[ -s "$LOGINS" ] || { echo "missing $LOGINS: <name> <github-login> <partner-name> per line" >&2; exit 1; }
+
+field() {  # field <name> <column>
+  awk -v n="$1" -v c="$2" '$1 == n { print $c }' "$LOGINS"
+}
+
+create() {
+  local name=$1 repo=$GITHUB_OWNER/f021-$1 tmp tag
+  tmp=$(mktemp -d)
+  ../module6/copy repo "$tmp" "$name" "$GITHUB_OWNER" >/dev/null
+  git -C "$tmp" init -q -b main
+  git -C "$tmp" add -A
+  git -C "$tmp" commit -q -m "WordPress, dev environment"
+  tag=$(git -C "$tmp" log -1 --format=%H -- app | cut -c1-7)
+  sed -i "s/newTag: \"0000000\"/newTag: \"$tag\"/" "$tmp/envs/dev/kustomization.yaml"
+  git -C "$tmp" commit -q -am "dev: $tag"
+  gh repo create "$repo" "--$VISIBILITY" --source "$tmp" --push \
+    --description "F021 module 6 — WordPress config repo of $name" >/dev/null
+  rm -rf "$tmp"
+  echo -n "created ($tag) "
+}
+
+first_build() {
+  local repo=$1 i
+  sleep 10   # the push may have started one already
+  [ -n "$(gh run list -R "$repo" -w image.yaml -L 1 --json databaseId -q '.[].databaseId')" ] && return
+  for i in 1 2 3 4 5 6; do
+    gh workflow run image.yaml -R "$repo" 2>/dev/null && { echo -n "build started "; return; }
+    sleep 5
+  done
+  echo -n "BUILD NOT STARTED (gh workflow run image.yaml -R $repo) "
+}
+
+for name in "${names[@]}"; do
+  repo=$GITHUB_OWNER/f021-$name
+  printf '%-8s ' "$name"
+  login=$(field "$name" 2)
+  partner=$(field "$name" 3)
+  [ -n "$login" ] || { echo "not in $LOGINS"; continue; }
+
+  if $protect; then
+    gh api -X PUT "repos/$repo/branches/main/protection" --input - >/dev/null <<'JSON'
+{
+  "required_status_checks": null,
+  "enforce_admins": false,
+  "required_pull_request_reviews": {
+    "required_approving_review_count": 1,
+    "require_code_owner_reviews": true,
+    "dismiss_stale_reviews": false
+  },
+  "restrictions": null
+}
+JSON
+    echo "main protected"
+    continue
+  fi
+
+  if gh repo view "$repo" >/dev/null 2>&1; then echo -n "kept "; else create "$name"; fi
+
+  # "Allow GitHub Actions to create and approve pull requests" (bump-dev, promote).
+  gh api -X PUT "repos/$repo/actions/permissions/workflow" \
+    -f default_workflow_permissions=read -F can_approve_pull_request_reviews=true
+
+  for l in "$login" ${partner:+$(field "$partner" 2)}; do
+    gh api -X PUT "repos/$repo/collaborators/$l" -f permission=push >/dev/null
+  done
+  echo -n "invited $login${partner:+ and $partner} "
+
+  first_build "$repo"
+  echo
+done

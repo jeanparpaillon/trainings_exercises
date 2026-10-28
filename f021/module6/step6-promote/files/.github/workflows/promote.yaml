@@ -1,0 +1,38 @@
+# Promotion: copy the image tag that runs in dev into prod, as a pull
+# request. The same image, never rebuilt: what prod gets is what dev ran.
+name: promote
+
+on:
+  workflow_dispatch:
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: dev
+        name: What runs in dev
+        run: |
+          name=$(yq '.images[] | select(.name == "wordpress") | .newName' envs/dev/kustomization.yaml)
+          tag=$(yq '.images[] | select(.name == "wordpress") | .newTag' envs/dev/kustomization.yaml)
+          echo "ref=$name:$tag" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Set it in envs/prod
+        env:
+          REF: ${{ steps.dev.outputs.ref }}
+        run: cd envs/prod && kustomize edit set image "wordpress=$REF"
+
+      - uses: peter-evans/create-pull-request@v7
+        with:
+          branch: promote/prod
+          commit-message: "prod: ${{ steps.dev.outputs.tag }}"
+          title: "prod: ${{ steps.dev.outputs.tag }}"
+          body: |
+            Promotes `${{ steps.dev.outputs.ref }}` from **dev** to **prod**.
+            Requested by @${{ github.actor }}.
+          delete-branch: true

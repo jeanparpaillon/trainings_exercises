@@ -1,0 +1,3 @@
+# Changes to prod need the approval of a code owner — not of their author.
+# Replace with your partner's GitHub login.
+/envs/prod/   @PARTNER-LOGIN

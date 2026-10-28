@@ -89,7 +89,7 @@ spec:
     # No limits.cpu: a CPU limit throttles instead of killing, which would
     # skew the load labs of module 3.
     limits.memory: 4Gi
-    # Bookinfo, WordPress + MySQL and the sample app run side by side, plus
+    # Bookinfo and WordPress + MySQL (twice, dev and prod, in module 6), plus
     # HPA replicas and load generators.
     pods: "30"
     # Module 2 storage lab: a few RWO volumes on local-path.

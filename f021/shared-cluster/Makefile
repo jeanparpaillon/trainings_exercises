@@ -94,9 +94,28 @@ grafana-users:
 kubeconfigs:
 	bin/kubeconfigs $(NAMES)
 
+# Module 6, before the session: each trainee's config repo
+# $(GITHUB_OWNER)/f021-<name>, from ../module6/repo/ (bin/config-repos;
+# secrets/github-logins first, NAMES="user1 user2" for some,
+# VISIBILITY=public if the plan cannot protect private branches).
+config-repos:
+	bin/config-repos $(NAMES)
+
+# Module 6, step 6: protect main, prod changes approved by a code owner.
+protect-repos:
+	bin/config-repos --protect $(NAMES)
+
+# Module 6, step 3: uncomment the trainees' Flux tenants (NAMES= for some).
+# Then commit, push, flux reconcile kustomization tenants --with-source.
+enable-flux:
+	for n in $(or $(NAMES),$(TRAINEES)); do \
+	  sed -i "s/^  # - $$n-flux.yaml$$/  - $$n-flux.yaml/" tenants/kustomization.yaml; \
+	done
+	git diff --stat tenants/kustomization.yaml
+
 # Module 6: each trainee's deploy key on their config repo
 # $(GITHUB_OWNER)/f021-<name> (NAMES="user1 user2" for some). The repos must
-# exist; then uncomment <name>-flux.yaml in tenants/kustomization.yaml.
+# exist (make config-repos); then make enable-flux at step 3.
 deploy-keys:
 	for n in $(or $(NAMES),$(TRAINEES)); do \
 	  gh repo deploy-key add secrets/deploy-keys/$$n.pub -R $(GITHUB_OWNER)/f021-$$n -t flux || exit 1; \
@@ -128,9 +147,12 @@ help:
 	@echo "  watch, status - Flux Kustomizations / HelmReleases"
 	@echo "  grafana-users - One Grafana login per trainee"
 	@echo "  kubeconfigs   - One kubeconfig per trainee, client certificate (NAMES= for some)"
+	@echo "  config-repos  - Module 6: create the trainees' config repos (NAMES= for some)"
 	@echo "  deploy-keys   - Module 6: register the trainees' deploy keys (NAMES= for some)"
+	@echo "  enable-flux   - Module 6, step 3: enable the trainees' Flux tenants (then commit, push)"
+	@echo "  protect-repos - Module 6, step 6: protect main on the config repos"
 	@echo "  restart       - Restart every console"
 	@echo "  check         - Node, Flux, consoles (401 = up, behind basic auth), Grafana"
 	@echo "  help          - Show this help message"
 
-.PHONY: all create delete kubeconfig image render secrets bootstrap watch status grafana-users kubeconfigs deploy-keys restart check help
+.PHONY: all create delete kubeconfig image render secrets bootstrap watch status grafana-users kubeconfigs config-repos protect-repos enable-flux deploy-keys restart check help

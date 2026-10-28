@@ -126,53 +126,31 @@ Flagger) are gone; `ci_troubleshooting.md` is out of the session.
 
 | Lab | Slides | Status | Material |
 | --- | --- | --- | --- |
-| WordPress through a pipeline: two envs, deploy from CI (push) and its challenges, then Flux takes over, drift, tag-bump pipeline, promotion and rollback by PR, commit-status alerts | `gitops_lab.md` | 🆕 | **Nothing written yet.** To build in `module6/`, described below |
+| WordPress through a pipeline: two envs, deploy from CI (push) and its challenges, then Flux takes over, drift, tag-bump pipeline, promotion and rollback by PR, commit-status alerts | `gitops_lab.md` | 🆕 | [`module6/`](module6/): `repo/` (the config repo template), `copy` (copies a step into the trainee's repo), `step1-envs` … `step7-alerts`. Trainer side in `shared-cluster/`: `make config-repos`, `deploy-keys`, `enable-flux` (step 3), `protect-repos` (step 6). Checked: both overlays rendered and server dry-run as a trainee; tenant, Provider/Alert and `ci-deployer` dry-run; StatefulSet `volumeClaimTemplates` still immutable on 1.37 (step 7); image built, plugin linted, Trivy gate passes on `wordpress:7.1-apache` (fails on 6.8); both plugin versions exercised (the step 6 one fails in prod only); workflows pass actionlint. **Not run end to end**: no repo created on GitHub yet, so GHCR pull with the PAT, `bump-dev`/`promote` pull requests, branch protection and Flux commit statuses are unverified |
 
 The application is the module 2 WordPress (Deployment + MySQL StatefulSet),
 deployed twice in the attendee's namespace: `envs/dev` (1 replica) and
 `envs/prod` (2), Kustomize overlays on one `k8s/base/`, told apart by
 `nameSuffix` (`-dev` / `-prod`) and an `env` label with `includeSelectors`.
-Each overlay merges `WORDPRESS_DB_HOST=mysql-<env>` and `APP_ENV=<env>` into
-the base ConfigMap (kustomize renames objects, not env values) and patches
-the Ingress host (`wordpress-dev.<ns>…`, `wordpress.<ns>…`). Quota: about
-500m CPU / 1.3 GiB requested for both envs, 2 PVCs — the module 2–4
-WordPress is deleted in the setup.
+Each overlay merges `host=mysql-<env>:3306` and `env=<env>` into the base's
+generated ConfigMap (kustomize renames objects, not env values) and patches
+the Ingress host. The Secrets `wordpress-db` (from module 1) and `ghcr`
+(image pull) are created by hand, outside the kustomization, so the suffix
+leaves references to them alone. Quota: ~500m CPU / 1.4 GiB requested for
+both envs, 2 PVCs — the setup removes the module 2–4 WordPress and Bookinfo.
 
-To write in `module6/` (commands run from `f021/`, the config repo cloned
-in `$REPO`):
+Before the session:
 
-| Path | Content |
-| --- | --- |
-| `README.md` | conventions, prerequisites (GitHub account, classic PAT with `repo`, `workflow`, `read:packages`), setup and steps 1–7 |
-| `repo/` | template of the config repo: `app/` (Dockerfile `FROM wordpress:6.8-apache` + a must-use plugin printing "`<env>` · `<version>`" in the footer: version as a build arg, env from the ConfigMap; files under `/usr/src/wordpress/` so the entrypoint copies them into the `emptyDir`), `k8s/base/` (Deployment with `imagePullSecrets: ghcr`, StatefulSet `mysql` 1Gi, Services, Ingress, ConfigMap, Secret `wordpress-db` referenced, not included), `envs/dev/`, `.github/workflows/image.yaml` (build, Trivy, push `ghcr.io/<repo>:<short sha>`). Namespace rendered in by the trainer at repo creation |
-| `step1-envs/` | `envs/prod/` solution |
-| `step2-push/` | `ci-deployer.yaml` (SA + RoleBinding `edit`), `ci-kubeconfig` (8 h token, API `srv2052563.hstgr.cloud:6443`, cluster CA), workflow with the `deploy` job (`kustomize edit set image`, `kubectl apply -k envs/dev`, `rollout status`) |
-| `step3-flux/` | README only: the tenant is the trainer's; commit the running tag, delete the deploy job, `KUBECONFIG_DEV` and `ci-deployer` |
-| `step4-drift/` | README only: scale, ConfigMap edit, unknown object, pruned file, suspend / resume |
-| `step5-pipeline/` | `image.yaml` with the `bump-dev` job (set image, render + kubeconform, `peter-evans/create-pull-request`), `manifests.yaml` (on PR: render both envs, kubeconform, rendered diff comment) |
-| `step6-promote/` | `CODEOWNERS` (`/envs/prod/`), `promote.yaml` (`workflow_dispatch`: dev `newTag` → prod, PR), a broken mu-plugin (PHP fatal) to promote and revert |
-| `step7-alerts/` | `alert.yaml`: Flux `Provider` `github` (Secret `github-token`) + `Alert` on both Kustomizations; the breaking change (MySQL `volumeClaimTemplates` 1Gi → 2Gi in the base: valid schema, immutable at apply) |
-
-Also needed, outside `module6/`:
-
-- **Flux tenant** (`shared-cluster/templates/tenant-flux.yaml.tmpl`, then
-  `make render`): two Kustomizations `wordpress-dev` / `wordpress-prod` on
-  `./envs/dev` / `./envs/prod` instead of `sample-app` on `./deploy`, with
-  `wait: true` and a `timeout` (step 7 relies on health). Same
-  `serviceAccountName: flux`, prune, 1m. The "sample app" wording in
-  `shared-cluster/README.md` (lab table, maintenance) to update with it.
-- **Trainer's repo setup**, per attendee: `$GITHUB_OWNER/f021-<name>` from
-  `module6/repo/`, the attendee as collaborator, first image built,
-  *Allow GitHub Actions to create pull requests*, branch protection on
-  `main` with one required review from code owners. Branch protection and
-  private GHCR packages on a personal account: **check the plan** (private
-  repos need GitHub Pro), or make the repos public. A script for this
-  (`gh repo create --template`, `gh api` for the settings) belongs in
-  `shared-cluster/` next to `make deploy-keys`.
-- **`gh` in the console image** (`shared-cluster/console/`): the slides use
-  `gh secret set/delete` and `gh workflow run`; without it, the GitHub web
-  UI does the same.
+- `secrets/github-logins` (git-ignored): `<name> <github-login>
+  <partner-name>` per trainee, then `make config-repos deploy-keys`. The
+  repos are private by default: branch protection (step 6) then needs a
+  paid plan for `GITHUB_OWNER`, else `VISIBILITY=public`.
+- **Console image**: `console/Dockerfile` now installs `gh`, but
+  `CONSOLE_IMAGE` is not bumped — bump it to `f021-console:2`, `make image
+  render`, commit, push (in that order: kind never pulls). Until then the
+  module 6 README installs `gh` in the trainee's home.
 - Check that GitHub-hosted runners reach the API server on 6443 (step 2).
+- Run it once end to end on the trainer's own tenant (`jean`).
 
 ### Module 7 — Best practices for operations and administration
 

@@ -1,0 +1,94 @@
+# The app pipeline, step 2: build, scan, push — then deploy to dev with
+# kubectl, from the runner.
+name: image
+
+on:
+  push:
+    branches: [main]
+    paths: ['app/**']
+  workflow_dispatch:
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.tag.outputs.image }}
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # The tag is the last commit that changed app/: a commit that only
+      # touches manifests does not make a new image, and rebuilding the same
+      # source gives the same tag.
+      - id: tag
+        name: Image name and tag
+        run: |
+          echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+          echo "tag=$(git log -1 --format=%H -- app | cut -c1-7)" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      # Tags are immutable: never push over one that exists.
+      - id: exists
+        name: Already pushed?
+        env:
+          REF: ${{ steps.tag.outputs.image }}:${{ steps.tag.outputs.tag }}
+        run: |
+          if docker manifest inspect "$REF" >/dev/null 2>&1; then
+            echo "$REF exists, nothing to build"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build
+        if: steps.exists.outputs.exists != 'true'
+        env:
+          REF: ${{ steps.tag.outputs.image }}:${{ steps.tag.outputs.tag }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          docker build app -t "$REF" --build-arg VERSION="$TAG" \
+            --label org.opencontainers.image.source="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+
+      # Fails on critical vulnerabilities that have a fix; reports the rest.
+      - name: Scan
+        if: steps.exists.outputs.exists != 'true'
+        env:
+          REF: ${{ steps.tag.outputs.image }}:${{ steps.tag.outputs.tag }}
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.58.1 image --no-progress --scanners vuln \
+            --severity CRITICAL --ignore-unfixed --exit-code 1 "$REF"
+
+      - name: Push
+        if: steps.exists.outputs.exists != 'true'
+        env:
+          REF: ${{ steps.tag.outputs.image }}:${{ steps.tag.outputs.tag }}
+        run: docker push "$REF"
+
+  # The push way: the runner holds a kubeconfig for your namespace and
+  # applies the dev overlay with the new tag. The tag is set in the
+  # runner's checkout only — it is never committed.
+  deploy:
+    needs: image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to dev
+        env:
+          KUBECONFIG_DATA: ${{ secrets.KUBECONFIG_DEV }}
+          REF: ${{ needs.image.outputs.image }}:${{ needs.image.outputs.tag }}
+        run: |
+          printf '%s\n' "$KUBECONFIG_DATA" > "$RUNNER_TEMP/kubeconfig"
+          export KUBECONFIG=$RUNNER_TEMP/kubeconfig
+          cd envs/dev
+          kustomize edit set image "wordpress=$REF"
+          kubectl apply -k .
+          kubectl rollout status deploy/wordpress-dev --timeout=5m

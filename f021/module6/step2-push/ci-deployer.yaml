@@ -1,0 +1,20 @@
+# The identity of the deploy job in GitHub Actions: a ServiceAccount with
+# the built-in `edit` role in your namespace — what `kubectl apply -k` of
+# the overlay needs, no more. Its token leaves the cluster: it is stored as
+# an Actions secret (ci-kubeconfig).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ci-deployer
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ci-deployer-edit
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: edit
+subjects:
+  - kind: ServiceAccount
+    name: ci-deployer
