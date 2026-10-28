@@ -18,6 +18,10 @@ $K apply -k "$monitoring/step4-dashboard" >/dev/null
 rolled_out 300s || die "a rollout is still stuck: kubectl -n $NS get pods, then ask the trainer"
 if blog_ok; then
   echo "Your namespace is back to the end of the monitoring lab."
+elif curl -s -m 10 -o /dev/null -w '%{redirect_url}' "$BLOG" | grep -q 'install\.php'; then
+  # Nothing to undo: MySQL runs on a volume WordPress was never installed
+  # on (a claim deleted by hand, or scenario 7 fixed onto a new volume).
+  die "WordPress asks to be installed: its database is empty. Open $BLOG, install it, then run reset again."
 else
   die "still not healthy: ask the trainer"
 fi
