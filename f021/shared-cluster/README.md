@@ -148,7 +148,7 @@ Per lab of the eight-module program (see [`../README.md`](../README.md)).
 | 3 · autoscale, step "HPA on request rate" | Bookinfo meshed (Linkerd proxies export `request_total`) | Linkerd installed; the step injects the namespace |
 | 3 · harden, step "spread and budgets" | several nodes to drain | **single node**: trainer demo on kind |
 | 4 · monitoring | kube-prometheus-stack, Grafana logins (Editor), ServiceMonitor / PodMonitor / PrometheusRule rights, dashboards from ConfigMaps in any namespace, **Traefik scraped** (PodMonitor `traefik/traefik`, `infrastructure/configs/traefik-metrics.yaml`) | installed; Traefik's PodMonitor to push, then **check** `count(traefik_service_requests_total)` in Explore |
-| 4 · tracing | Grafana data source **Jaeger &lt;ns&gt;** per trainee (rendered into `tenants/`, ConfigMap in `monitoring` loaded by Grafana's datasource sidecar); Jaeger and HotROD deployed by the trainee, in their namespace | rendered; **check** one data source per trainee in Grafana → *Connections* |
+| 4 · tracing | Grafana data source **Jaeger &lt;ns&gt;** per trainee (rendered into `tenants/`, ConfigMap in `monitoring` loaded by Grafana's datasource sidecar); Jaeger and HotROD deployed by the trainee, in their namespace | installed; **check** one data source per trainee in Grafana → *Connections* (errors until that trainee's Jaeger runs) |
 | 4 · logging | a log stack (Loki + an agent) | **not installed**: `kubectl logs` only, or add it here |
 | 4 · troubleshooting | namespace-level faults only (`module4/troubleshoot/`), run with the trainee's rights; scenario 6 needs NetworkPolicy enforcement | nothing to install |
 | 5 · least privilege | starting from `trainee` rights | installed |
