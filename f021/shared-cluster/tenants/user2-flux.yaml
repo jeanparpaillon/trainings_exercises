@@ -13,6 +13,11 @@
 # quotas or other namespaces. The controllers' --default-service-account
 # lockdown means forgetting serviceAccountName gives them no rights at all.
 #
+# The overlays carry no namespace (the trainees apply them with -n):
+# targetNamespace puts every object in user2, whatever the repo says. Without
+# it the objects reach the API server unnamespaced and the flux
+# ServiceAccount is refused "at the cluster scope".
+#
 # One Kustomization per environment, on its overlay; `wait` makes health
 # part of Ready (step 7: a refused or unhealthy apply shows as not Ready, and
 # as a failed commit status).
@@ -54,6 +59,7 @@ metadata:
   namespace: user2
 spec:
   serviceAccountName: flux
+  targetNamespace: user2
   interval: 1m
   retryInterval: 1m
   timeout: 3m
@@ -71,6 +77,7 @@ metadata:
   namespace: user2
 spec:
   serviceAccountName: flux
+  targetNamespace: user2
   interval: 1m
   retryInterval: 1m
   timeout: 3m
