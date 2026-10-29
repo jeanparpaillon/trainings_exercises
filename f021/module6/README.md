@@ -146,12 +146,12 @@ first, or Flux recreates them within a minute).
 `GITHUB_OWNER`):
 
 1. `secrets/github-logins` (git-ignored), one line per trainee:
-   `<name> <github-login> <partner-name>`. Partners must have write access
-   to each other's repo to be code owners: the script invites both.
+   `<name> <github-login>`. Every trainee gets write access to every repo,
+   so anyone can review, and be a code owner, on anyone else's.
 2. `make config-repos` (or `NAMES="user1 user2"`): for each trainee,
    creates `$GITHUB_OWNER/f021-<name>` from [`repo/`](repo/) (namespace
    rendered in; dev's `newTag` set to the tag the first build will push),
-   lets Actions open pull requests, invites the trainee and their partner,
+   lets Actions open pull requests, invites every trainee,
    and starts the first image build. Existing repos are skipped.
    `VISIBILITY=public` if the owner's plan cannot protect branches of
    private repos (step 6).

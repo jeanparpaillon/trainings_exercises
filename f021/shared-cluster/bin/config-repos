@@ -6,9 +6,9 @@
 #   bin/config-repos --protect [user1 user2…]  # protect main, at step 6
 #
 # Reads secrets/github-logins (git-ignored: logins are personal), one line
-# per trainee: `<name> <github-login> <partner-name>`. Both the trainee and
-# their partner are invited with write access: a code owner (step 6) must
-# be able to write to the repo.
+# per trainee: `<name> <github-login>`. Every trainee is invited with write
+# access to every repo: anyone can review, and be a code owner (step 6),
+# on anyone else's — a code owner must be able to write to the repo.
 #
 # Creating a repo: renders ../module6/repo/ with the trainee's namespace,
 # commits it, then sets dev's newTag to the tag the first build pushes (the
@@ -31,11 +31,14 @@ VISIBILITY=${VISIBILITY:-private}
 protect=false
 [ "${1:-}" = --protect ] && { protect=true; shift; }
 if [ $# -gt 0 ]; then names=("$@"); else read -ra names <<< "$TRAINEES"; fi
-[ -s "$LOGINS" ] || { echo "missing $LOGINS: <name> <github-login> <partner-name> per line" >&2; exit 1; }
+[ -s "$LOGINS" ] || { echo "missing $LOGINS: <name> <github-login> per line" >&2; exit 1; }
 
 field() {  # field <name> <column>
   awk -v n="$1" -v c="$2" '$1 == n { print $c }' "$LOGINS"
 }
+
+# Every trainee's login, except the owner's: the owner cannot be a collaborator.
+mapfile -t logins < <(awk -v o="$GITHUB_OWNER" 'NF && $2 != o { print $2 }' "$LOGINS")
 
 create() {
   local name=$1 repo=$GITHUB_OWNER/f021-$1 tmp tag
@@ -68,7 +71,6 @@ for name in "${names[@]}"; do
   repo=$GITHUB_OWNER/f021-$name
   printf '%-8s ' "$name"
   login=$(field "$name" 2)
-  partner=$(field "$name" 3)
   [ -n "$login" ] || { echo "not in $LOGINS"; continue; }
 
   if $protect; then
@@ -94,10 +96,10 @@ JSON
   gh api -X PUT "repos/$repo/actions/permissions/workflow" \
     -f default_workflow_permissions=read -F can_approve_pull_request_reviews=true
 
-  for l in "$login" ${partner:+$(field "$partner" 2)}; do
+  for l in "${logins[@]}"; do
     gh api -X PUT "repos/$repo/collaborators/$l" -f permission=push >/dev/null
   done
-  echo -n "invited $login${partner:+ and $partner} "
+  echo -n "invited ${#logins[@]} trainees "
 
   first_build "$repo"
   echo

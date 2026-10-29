@@ -142,8 +142,8 @@ both envs, 2 PVCs — the setup removes the module 2–4 WordPress and Bookinfo.
 
 Before the session:
 
-- `secrets/github-logins` (git-ignored): `<name> <github-login>
-  <partner-name>` per trainee, then `make config-repos deploy-keys`. The
+- `secrets/github-logins` (git-ignored): `<name> <github-login>` per
+  trainee, then `make config-repos deploy-keys`. The
   repos are private by default: branch protection (step 6) then needs a
   paid plan for `GITHUB_OWNER`, else `VISIBILITY=public`.
 - **Console image**: `console/Dockerfile` now installs `gh`, but
