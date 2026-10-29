@@ -11,7 +11,7 @@ resources:
   - user3.yaml
   # - user3-flux.yaml
   - user4.yaml
-  # - user4-flux.yaml
+   - user4-flux.yaml
   - user5.yaml
   # - user5-flux.yaml
   - user6.yaml
