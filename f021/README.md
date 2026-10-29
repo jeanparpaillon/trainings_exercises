@@ -59,7 +59,7 @@ This repo holds what the labs run.
 | `module1/` | Fundamental concepts and cluster architecture | first deployment · CronJob · Bookinfo · WordPress |
 | `module2/` | Storage and network management | storage and StatefulSet · expose and reach your application |
 | `module3/` | Scaling and high availability | measure, right-size, autoscale · harden the application |
-| `module4/` | Monitoring, logging and troubleshooting | troubleshooting scenarios (monitoring: trainer demo, no lab) |
+| `module4/` | Monitoring, logging and troubleshooting | monitoring your application · tracing a request · troubleshooting scenarios |
 | `module5/` | Kubernetes cluster security | least privilege · Pod Security, network policies, secrets |
 | `module6/` | Observability, CI/CD and troubleshooting | one 4 h GitOps lab: deploy from CI, then Flux, drift, pipeline, promotion, alerts — WordPress, dev and prod |
 | `module7/` | Best practices for operations and administration | tenants (demo) · backup (demo) · production checklist |
@@ -108,6 +108,7 @@ Legend: ✅ reuse as is · ✏️ update · 🆕 new
 | Lab | Slides | Status | Material |
 | --- | --- | --- | --- |
 | Monitoring your application (look, exporter and edge metrics, alerts, dashboard as code) | `lab_monitoring.md` | 🆕 | `module4/monitoring/` step1-look … step4-dashboard, on WordPress (`module2/network/step2-gateway`): loadgen through Traefik, mysqld-exporter sidecar + PodMonitor, PrometheusRule and dashboard ConfigMap rendered per namespace. Needs the platform PodMonitor `traefik/traefik` for the edge metrics. Exporter checked locally (Docker); manifests and PromQL checked on the cluster (dry-run, queries); not run end to end yet |
+| Tracing a request (deploy and look, find the bottleneck, fix and compare) | `tracing.md` | 🆕 | `module4/tracing/` step1-deploy … step3-fix: HotROD (Jaeger's demo, `example-hotrod:2.20.0`) and Jaeger all-in-one (`jaeger:2.20.0`, in memory) in the attendee's namespace, Ingress rendered per namespace, independent of WordPress. Read in Grafana through a per-trainee Jaeger data source rendered into the tenants (Jaeger pinned at 2.20: 2.21 dropped the API Grafana reads). Run locally (Docker, with Grafana 13.2.4 as on the cluster): spans received, lock and redis errors visible, `/dispatch` ×5 at 0.7–2.0 s before the fix, 0.5–0.66 s after; Grafana search and trace view work; kustomizations build, data source ConfigMap passes a server dry-run. Not run on the cluster yet |
 | Troubleshooting scenarios | `lab_troubleshooting.md` | ✅ | `module4/troubleshoot/` (`break` / `check` / `reset`, `scenarios/1-7`), on WordPress as module 2 left it (`network/step2-gateway`), attendee's own rights. Ported from Bookinfo: 1 password rotated in the Secret only, 2 Service selector, 3 missing image tag, 4 liveness probe, 5 quota-stuck rollout, 6 DNS blocked by a NetworkPolicy, 7 StatefulSet on a missing StorageClass. Patches pass a server dry-run; not run end to end yet |
 
 ### Module 5 — Kubernetes cluster security

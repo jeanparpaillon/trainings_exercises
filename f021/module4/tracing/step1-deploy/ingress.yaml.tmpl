@@ -1,0 +1,36 @@
+# Shared cluster: two host names per attendee, served by Traefik.
+# Render it into ingress.yaml (git-ignored), which the kustomization uses:
+#
+#   sed "s/CHANGEME/$NS/g" tracing/step1-deploy/ingress.yaml.tmpl \
+#     > tracing/step1-deploy/ingress.yaml
+#
+# The Jaeger UI has no login: anyone with the URL reads your traces. Fine
+# for HotROD's fake rides; a real trace store is reached through Grafana,
+# behind its login.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tracing
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: hotrod.CHANGEME.195.35.2.222.nip.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: hotrod
+                port:
+                  number: 80
+    - host: jaeger.CHANGEME.195.35.2.222.nip.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: jaeger
+                port:
+                  number: 16686

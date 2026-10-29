@@ -10,8 +10,9 @@
 # comes from their groups (infrastructure/configs/rbac/trainee-read.yaml);
 # Headlamp's ServiceAccount is bound here, by name.
 #
-# Also here: the `trainee` quota and default requests, and the right to label
-# their own namespace (Pod Security lab).
+# Also here: the `trainee` quota and default requests, the right to label
+# their own namespace (Pod Security lab), and their Grafana data source for
+# the tracing lab (in namespace monitoring).
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -136,3 +137,33 @@ roleRef:
   name: trainee-cluster-read
 subjects:
   - { kind: ServiceAccount, name: headlamp, namespace: user6 }
+---
+# Grafana data source "Jaeger user6", for the module 4 tracing lab: reads the
+# Jaeger the trainee deploys in user6 (module4/tracing/step1-deploy). Errors
+# until that Jaeger exists. Editors cannot create data sources, so the
+# platform provides it: Grafana's datasource sidecar loads ConfigMaps
+# labelled grafana_datasource: "1" from namespace monitoring (its own, the
+# chart default). One file per trainee in the same folder: the key carries
+# the name.
+#
+# Grafana's Jaeger data source reads Jaeger's legacy /api/* query API, which
+# Jaeger 2.21 removed: the lab pins Jaeger 2.20.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trainee-user6-jaeger-datasource
+  namespace: monitoring
+  labels:
+    grafana_datasource: "1"
+data:
+  jaeger-user6.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Jaeger user6
+        uid: jaeger-user6
+        type: jaeger
+        access: proxy
+        url: http://jaeger.user6.svc:16686
+        jsonData:
+          nodeGraph:
+            enabled: true

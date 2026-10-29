@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../step1-deploy
+
+# HotROD's bottlenecks are on purpose, and each has a switch:
+#   --fix-disable-db-conn-mutex     no lock around the (fake) MySQL connection
+#   --fix-route-worker-pool-size    route calls in parallel (default 3)
+# The third one, --fix-db-query-delay (300ms by default), is left alone:
+# a slow query you cannot change is a fact of life, a lock is a bug.
+patches:
+  - target:
+      kind: Deployment
+      name: hotrod
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: --fix-disable-db-conn-mutex
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: --fix-route-worker-pool-size=100

@@ -1,0 +1,56 @@
+# HotROD, Jaeger's demo: a ride-booking app in one binary, four services
+# calling each other over HTTP and gRPC on localhost (frontend 8080,
+# customer 8081, driver 8082, route 8083), plus a fake MySQL and Redis.
+# Instrumented with OpenTelemetry: it exports OTLP to the address in
+# OTEL_EXPORTER_OTLP_ENDPOINT, the standard variable — the same one a .NET
+# service reads (slide "OpenTelemetry in your .NET app").
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hotrod
+  labels:
+    app: hotrod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hotrod
+  template:
+    metadata:
+      labels:
+        app: hotrod
+    spec:
+      containers:
+        - name: hotrod
+          image: jaegertracing/example-hotrod:2.20.0
+          # $(NS) is expanded by the kubelet from the env below: the "find
+          # trace" links of the HotROD page point at your Jaeger UI.
+          args:
+            - all
+            - --jaeger-ui=http://jaeger.$(NS).195.35.2.222.nip.io
+          env:
+            - name: NS
+              valueFrom:
+                fieldRef: { fieldPath: metadata.namespace }
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://jaeger:4318
+          ports:
+            - { containerPort: 8080, name: http }
+          readinessProbe:
+            httpGet: { path: /config, port: http }
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hotrod
+spec:
+  selector:
+    app: hotrod
+  ports:
+    - { port: 80, targetPort: http, name: http }

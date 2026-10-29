@@ -6,11 +6,14 @@ Exercises for module 4 of **F021**. The slides are in the `trainings` repo,
 | | Lab | Slides | ~ |
 | --- | --- | --- | --- |
 | [monitoring/](monitoring/) | your WordPress in Prometheus and Grafana: what is measured already, an exporter and the edge's metrics, alerts, a dashboard as code | `monitoring.md`, then `lab_monitoring.md` | 60 min |
+| [tracing/](tracing/) | tracing a request: HotROD and Jaeger in your namespace, read the waterfall, find the lock, fix and compare | `tracing.md` | 40 min |
 | [troubleshoot/](troubleshoot/) | troubleshooting scenarios: `break`, find it with the method, `check` | `troubleshooting.md`, then `lab_troubleshooting.md` | 60 min |
 
 No logging lab: no log stack on the shared cluster, `kubectl logs` only
-(`logging.md`). The two labs chain: troubleshooting starts from the end of
-monitoring, so the alerts written in the first lab fire during the second.
+(`logging.md`). The tracing lab brings its own Jaeger and stands apart:
+it neither needs nor touches WordPress. The other two labs chain:
+troubleshooting starts from the end of monitoring, so the alerts written
+in the first lab fire during the second.
 Every path below is relative to this directory:
 
 ```sh
@@ -55,6 +58,15 @@ Before the session, on the shared cluster:
   login and password, role Editor).
 - **Logging**: no log stack is installed (`shared-cluster/README.md`):
   `kubectl logs` only, in the labs and in `logging.md`.
+- **Tracing**: no tracing stack either; the lab deploys its own Jaeger
+  per namespace (~100m CPU, ~200 MiB requested with HotROD). Grafana
+  reads it through the data source **Jaeger &lt;ns&gt;**, one per trainee,
+  rendered into the tenants (ConfigMap `trainee-<ns>-jaeger-datasource`
+  in `monitoring`). Check: Grafana → *Connections* → *Data sources*, one
+  per trainee; *Save & test* turns green once that trainee's Jaeger runs.
+  Jaeger stays at **2.20**: 2.21 dropped the query API Grafana reads (404).
+  Pull `jaegertracing/jaeger:2.20.0` and `jaegertracing/example-hotrod:2.20.0`
+  onto the node beforehand if the room's bandwidth is short.
 - **Scenario 6** (DNS blocked by a NetworkPolicy) needs the CNI to enforce
   NetworkPolicy: same check as the module 2 network lab, step 4.
 - **Scenario 5** (rollout stuck on the quota) computes its memory request

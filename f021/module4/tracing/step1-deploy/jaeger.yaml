@@ -1,0 +1,50 @@
+# Jaeger v2 all-in-one: an OpenTelemetry Collector with Jaeger's storage
+# and UI built in. Receives OTLP (4317 gRPC, 4318 HTTP), serves the UI and
+# its API on 16686. Traces are kept IN MEMORY: lost when the pod restarts
+# — fine for a lab, never for production (Tempo or Jaeger on a real store,
+# behind the platform's Collector: slide "The pipeline").
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger
+  labels:
+    app: jaeger
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jaeger
+  template:
+    metadata:
+      labels:
+        app: jaeger
+    spec:
+      containers:
+        - name: jaeger
+          # Not 2.21: it dropped the legacy /api/* query API that Grafana's
+          # Jaeger data source reads ("Jaeger <ns>", provided by the platform).
+          image: jaegertracing/jaeger:2.20.0
+          ports:
+            - { containerPort: 4317, name: otlp-grpc }
+            - { containerPort: 4318, name: otlp-http }
+            - { containerPort: 16686, name: ui }
+          readinessProbe:
+            httpGet: { path: /, port: ui }
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger
+spec:
+  selector:
+    app: jaeger
+  ports:
+    - { port: 4317, targetPort: otlp-grpc, name: otlp-grpc }
+    - { port: 4318, targetPort: otlp-http, name: otlp-http }
+    - { port: 16686, targetPort: ui, name: ui }

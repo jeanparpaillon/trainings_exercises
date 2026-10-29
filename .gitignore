@@ -9,5 +9,6 @@
 /f021/module2/network/step2-gateway/httproute.yaml
 /f021/module4/monitoring/step3-alerts/prometheusrule.yaml
 /f021/module4/monitoring/step4-dashboard/dashboard.yaml
+/f021/module4/tracing/step1-deploy/ingress.yaml
 # What the troubleshooting scenarios remember to undo themselves.
 /f021/module4/troubleshoot/.state/
