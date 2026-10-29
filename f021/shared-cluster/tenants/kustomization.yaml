@@ -17,7 +17,7 @@ resources:
   - user6.yaml
   # - user6-flux.yaml
   - user7.yaml
-  # - user7-flux.yaml
+  - user7-flux.yaml
   - user8.yaml
   # - user8-flux.yaml
   - jean.yaml
