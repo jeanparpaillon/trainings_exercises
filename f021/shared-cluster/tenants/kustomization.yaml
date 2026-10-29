@@ -5,20 +5,20 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - user1.yaml
-  # - user1-flux.yaml
+  - user1-flux.yaml
   - user2.yaml
-  # - user2-flux.yaml
+  - user2-flux.yaml
   - user3.yaml
   # - user3-flux.yaml
   - user4.yaml
-  # - user4-flux.yaml
+  - user4-flux.yaml
   - user5.yaml
   # - user5-flux.yaml
   - user6.yaml
   # - user6-flux.yaml
   - user7.yaml
-  # - user7-flux.yaml
+  - user7-flux.yaml
   - user8.yaml
-  # - user8-flux.yaml
+  - user8-flux.yaml
   - jean.yaml
-  # - jean-flux.yaml
+  - jean-flux.yaml
