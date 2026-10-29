@@ -146,10 +146,6 @@ Before the session:
   trainee, then `make config-repos deploy-keys`. The
   repos are private by default: branch protection (step 6) then needs a
   paid plan for `GITHUB_OWNER`, else `VISIBILITY=public`.
-- **Console image**: `console/Dockerfile` now installs `gh`, but
-  `CONSOLE_IMAGE` is not bumped — bump it to `f021-console:2`, `make image
-  render`, commit, push (in that order: kind never pulls). Until then the
-  module 6 README installs `gh` in the trainee's home.
 - Check that GitHub-hosted runners reach the API server on 6443 (step 2).
 - Run it once end to end on the trainer's own tenant (`jean`).
 

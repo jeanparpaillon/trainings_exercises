@@ -16,4 +16,4 @@ images:
   # console/, loaded into the kind node by make image (CONSOLE_IMAGE in fleet.env)
   - name: console
     newName: f021-console
-    newTag: "1"
+    newTag: "2"
